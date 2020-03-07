@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Pythonのライブラリpandas_datareaderで株価を取得する
-https://www.mazarimono.net/entry/2018/07/20/pandas_datareader
+Pythonのライブラリpandas_datareaderで指定の株価を取得する
+参考:https://www.mazarimono.net/entry/2018/07/20/pandas_datareader
 
 Usage:
     call activate stock
