@@ -47,7 +47,6 @@ k_codes = input("""★★IPO情報を更新する会社を全て選んでくだ�
 番号を入力してください：""").split(",")
 
 #ALL指定の場合は全ての番号をループする（splitでリストになっている）
-#rangeで数値のリストを作成し、文字列のリストに変換する
 if k_codes[0] == "99":
     k_codes = list(range(0,19))
     k_codes = [str(k_code) for k_code in k_codes]
