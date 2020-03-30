@@ -25,7 +25,6 @@ os.makedirs(output_dir, exist_ok=True)
 
 ###メイン処理###
 k_codes = input("""★★IPO情報を更新する会社を全て選んでください★★:
-            ０：マスタ
             １：楽天証券
             ２：ＳＢＩ証券
             ３：ＳＭＢＣ日興証券
@@ -53,34 +52,23 @@ if k_codes[0] == "99":
     k_codes = list(range(0,19))
     k_codes = [str(k_code) for k_code in k_codes]
 else:
-    pass
+    assert set(k_codes) <= set([str(k_code) for k_code in list(range(0,19))]), "\n★★証券会社の番号が間違っています。指定された1-18,99のいずれかを入れて下さい。★★"
 
-#「kaisya_data」関数を使用する
+# 一応毎回マスタ更新する
+print("マスタのファイル更新開始...")
+_ = kl.kaisya_list("0",None,output_dir)
+
 #入力した会社情報を順番に取得する
 for k_code in k_codes:
-    error = "0"
     k_data = []
     k_data = kd.kaisya_data(k_code, password_dir)
-    print(str(k_data[0][0]) + "のファイル更新開始")
+    print(str(k_data[0][0]) + "のファイル更新開始...")
 
-    #「kaisya_list」関数を使用する
-    #入力した番号の会社のIPOリストを取得し、以下に保存する
+    #入力した番号の会社のIPOリストを取得
     ipo_list = kl.kaisya_list(k_code,k_data,output_dir)
-    if ipo_list == []:
-        error = "1"
-    else:
-        pass
 
-    #「kaisya_csv」関数を使用する
-    #マスタ更新の場合はIPOリストからcsvファイルを作成する
-    #マスタ以外の場合は各会社のIPOリストからcsvファイルを作成する
-    if error == "1":
-        pass
-    else:
-        if k_code == "0":
-            kc.master_csv(ipo_list,k_data,output_dir)
-        else:
-            kc.kaisya_csv(ipo_list,k_data,output_dir)
+    #各会社のIPOリストからcsvファイルを作成する
+    kc.kaisya_csv(ipo_list,k_data,output_dir)
 
 # ipo申込み
 for k_code in k_codes:

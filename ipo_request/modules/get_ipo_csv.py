@@ -98,7 +98,7 @@ class IpoData():
                     df = df.sort_values(by=['code'], ascending=True)
                     ipo_df = df[['code', 'name', 'entry_start', 'entry_end', 'tickets', 'price']]
                     ipo_df.to_csv(output_csv, encoding="shift_jis", header=None, index=False)
-                    print("INFO: save file. [{}] {}".format(output_csv, ipo_df.shape))
+                    #print("INFO: save file. [{}] {}".format(output_csv, ipo_df.shape))
                     break
 
             # 楽天のIPO銘柄ID-銘柄名
