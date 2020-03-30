@@ -10,11 +10,12 @@ Usage:
 from modules import kaisya_data as kd
 from modules import kaisya_list as kl
 from modules import kaisya_csv as kc
-from modules import kaisya_excel as ke
 from modules import request_ipo as ri
 
 ###初期処理###
-import os, sys, datetime
+import os
+import sys
+import datetime
 import pandas as pd
 
 #CHROMEDRIVER = r"C:\userApp\Selenium\chromedriver_win32\chromedriver.exe"
@@ -61,19 +62,18 @@ for k_code in k_codes:
     k_data = []
     k_data = kd.kaisya_data(k_code, password_dir)
     print(str(k_data[0][0]) + "のファイル更新開始")
-#「kaisya_list」関数を使用する
-#入力した番号の会社のIPOリストを取得し、以下に保存する
-#"C:\Users\User\code\ipo"
+
+    #「kaisya_list」関数を使用する
+    #入力した番号の会社のIPOリストを取得し、以下に保存する
     ipo_list = kl.kaisya_list(k_code,k_data,output_dir)
     if ipo_list == []:
         error = "1"
-        #print("リストが取得不可のため" + str(k_data[0][0]) + "の処理はスキップします")
     else:
         pass
 
-#「kaisya_csv」関数を使用する
-#マスタ更新の場合はIPOリストからcsvファイルを作成する
-#マスタ以外の場合は各会社のIPOリストからcsvファイルを作成する
+    #「kaisya_csv」関数を使用する
+    #マスタ更新の場合はIPOリストからcsvファイルを作成する
+    #マスタ以外の場合は各会社のIPOリストからcsvファイルを作成する
     if error == "1":
         pass
     else:
@@ -82,20 +82,7 @@ for k_code in k_codes:
         else:
             kc.kaisya_csv(ipo_list,k_data,output_dir)
 
-##「kaisya_excel」関数を使用する
-##マスタ更新の場合はエクセルファイルを更新する
-##マスタ以外の場合は各会社のcsvファイルからエクセルファイルを更新する
-#    if error == "1":
-#        pass
-#    else:
-#        if k_code == "0":
-#            ke.master_excel(k_data)
-#            print(str(k_data[0][0]) + "のファイル更新完了")
-#        else:
-#            ke.kaisya_excel(k_data)
-#            print(str(k_data[0][0]) + "のファイル更新完了")
-#
-
+# ipo申込み
 for k_code in k_codes:
     df_regist_ipo = ri.get_request_ipo_info(os.path.join(output_dir, 'master.csv'), os.path.join(output_dir, k_data[0][0]+'.csv'))
 

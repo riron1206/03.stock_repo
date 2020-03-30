@@ -6,7 +6,9 @@ Usage:
     $ activate tfgpu20
     $ python get_ipo_csv.py
 """
-import os, datetime, pathlib
+import os
+import datetime
+import pathlib
 import numpy as np
 import pandas as pd
 import warnings

@@ -1,14 +1,16 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-銘柄番号指定してseleniumでSBIのipoを申込む
+銘柄番号指定してseleniumでipoを申込む
 参考:https://papa111.com/2018/11/11/post-277/
 Usage:
-    call activate tfgpu20
+    call activate stock
     call python regist_ipo.py
     pause
 """
-import os, datetime, yaml
+import os
+import datetime
+import yaml
 import pandas as pd
 from time import sleep
 from selenium import webdriver
