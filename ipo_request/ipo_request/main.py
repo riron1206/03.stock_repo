@@ -7,10 +7,10 @@ Usage:
 """
 
 #使用するモジュールのインポート
-from modules import kaisya_data as kd
-from modules import kaisya_list as kl
-from modules import kaisya_csv as kc
-from modules import request_ipo as ri
+from libs import kaisya_data as kd
+from libs import kaisya_list as kl
+from libs import kaisya_csv as kc
+from libs import request_ipo as ri
 
 ###初期処理###
 import os

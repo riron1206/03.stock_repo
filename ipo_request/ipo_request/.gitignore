@@ -1,8 +1,9 @@
 # Git の管理に含めないファイルを指定するためのファイル https://qiita.com/inabe49/items/16ee3d9d1ce68daa9fff
 /__pycache__/
 /output/
-/password/
+/old/
 geckodriver.log
 /dist/
 /build/
 ipo_request.spec
+main.exe
