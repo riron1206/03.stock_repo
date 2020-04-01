@@ -16,10 +16,15 @@ from modules import request_ipo as ri
 import os
 import sys
 import datetime
+import argparse
 import pandas as pd
 
 #CHROMEDRIVER = r"C:\userApp\Selenium\chromedriver_win32\chromedriver.exe"
-password_dir = 'password'
+parser = argparse.ArgumentParser()
+parser.add_argument("-p_d", "--password_dir", type=str, default='../password'
+                    , help="password dir path.")
+args = vars(parser.parse_args())
+password_dir = args['password_dir']
 output_dir = 'output'
 os.makedirs(output_dir, exist_ok=True)
 

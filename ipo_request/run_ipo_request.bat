@@ -2,6 +2,8 @@
 
 call conda activate stock
 
-call python ipo_request.py
+cd ipo_request
+
+call python ipo_request.py -p_d C:\Users\shingo\jupyter_notebook\stock_work\03.stock_repo\ipo_request\password
 
 pause
