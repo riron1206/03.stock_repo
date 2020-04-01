@@ -5,5 +5,5 @@
 geckodriver.log
 /dist/
 /build/
-ipo_request.spec
+main.spec
 main.exe
