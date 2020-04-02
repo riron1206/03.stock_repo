@@ -4,7 +4,7 @@ $ cd C:\Users\shingo\jupyter_notebook\stock_work\03.stock_repo\ipo_request\ipo_r
 # --onefileつけると自作モジュールなどの関連ファイルも含めてexe化する
 # --noconsoleつけると実行するexeがコマンドプロンプトを出さないようにする
 # --cleanつけると古い実行ファイル(build,dist,main.spec)削除する
-$ pyinstaller ./main.py --onefile 
+$ pyinstaller ./main.py --onefile --clean
 →build,dist,main.specができる
 →main.specを変更する
 1. 3行目に下記コード追加

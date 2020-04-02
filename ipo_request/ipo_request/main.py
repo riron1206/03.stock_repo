@@ -21,12 +21,16 @@ import pandas as pd
 
 #CHROMEDRIVER = r"C:\userApp\Selenium\chromedriver_win32\chromedriver.exe"
 parser = argparse.ArgumentParser()
-parser.add_argument("-p_d", "--password_dir", type=str, default='../password'
+parser.add_argument("-o", "--output_dir", type=str, default='output'
+                    , help="output dir path.")
+parser.add_argument("-p", "--password_dir", type=str, default='../password'
                     , help="password dir path.")
 args = vars(parser.parse_args())
-password_dir = args['password_dir']
-output_dir = 'output'
+
+output_dir = args['output_dir']
 os.makedirs(output_dir, exist_ok=True)
+
+password_dir = args['password_dir']
 
 ###メイン処理###
 k_codes = input("""★★IPO情報を更新する会社を全て選んでください★★:
@@ -110,3 +114,5 @@ for k_code in k_codes:
             print(f'\n★★{ipo_code}の申込み成功しました★★')
         except Exception as e:
             print(f'\n★★{ipo_code}の申込み失敗しました。入力したIPOコードか価格が不正か、すでに申込み済みの可能性があります。★★')
+
+input(f"\nプログラムを終了します。何か入力してください。")
