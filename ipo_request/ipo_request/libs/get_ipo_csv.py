@@ -90,9 +90,10 @@ class IpoData():
                     df['price'] = df['price'].str.replace('円', '')
                     df['price'] = df['price'].str.replace('仮', '')
                     _df = df['price'].str.split('～', expand=True)
-                    _df = _df.rename(columns={0:'price_min', 1:'price_max'})
-                    price_max = _df.apply(self._get_price_max, axis=1)
-                    df['price'] = price_max
+                    if _df.shape[1] == 2:
+                        _df = _df.rename(columns={0:'price_min', 1:'price_max'})
+                        price_max = _df.apply(self._get_price_max, axis=1)
+                        df['price'] = price_max
                     df = df.replace('-', np.nan)
 
                     df = df.sort_values(by=['code'], ascending=True)
