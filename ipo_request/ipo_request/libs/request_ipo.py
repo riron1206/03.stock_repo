@@ -8,14 +8,16 @@ Usage:
     call python regist_ipo.py
     pause
 """
-import os
 import datetime
-import yaml
-import pandas as pd
+import os
 from time import sleep
+
+import pandas as pd
+import yaml
 from selenium import webdriver
-from selenium.webdriver.support.ui import Select
 from selenium.common.exceptions import NoSuchElementException
+from selenium.webdriver.support.ui import Select
+
 
 def _compare_date(row, now):
     # str→datetime.datetime
@@ -27,6 +29,7 @@ def _compare_date(row, now):
     end = datetime.date(end.year, end.month, end.day)
 
     if start <= now <= end:
+        #print(start, now, end)
         return end
     else:
         return None
@@ -53,8 +56,9 @@ def get_request_ipo_info(master_csv:str, kaisya_csv:str):
     now = datetime.date.today()
     #now = datetime.date(2020, 3, 15)# テスト用
     df_merge['within_date'] = df_merge.apply(_compare_date, now=now, axis='columns')
-    df_merge = df_merge.dropna(how='any')
+    df_merge = df_merge.dropna(subset=['within_date'])
     df_merge = df_merge.drop(['within_date'], axis=1)
+    #print(df_merge)
     df_merge.columns = ['コード', '銘柄名', '申込開始日', '申込終了日', '当選本数', '最大価格']
     df_merge = df_merge.set_index('コード')
     return df_merge

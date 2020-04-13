@@ -3,26 +3,31 @@
 #kaisya_list.py - 各会社のIPOリストを取得する
 #引数は会社コードと会社データとする
 
+import os
+import pathlib
+import re
+import sys
+import time
+
+import lxml
+import openpyxl as px
+import pandas as pd
+import requests
+import xlsxwriter
 #使用するモジュールのインポート
 from bs4 import BeautifulSoup as bs4
-from selenium import webdriver
 from openpyxl import load_workbook
+from selenium import webdriver
 from selenium.webdriver.firefox.options import Options
+
+import get_ipo_csv
+
 #from selenium.webdriver.chrome.options import Options
 #CHROMEDRIVER = r"C:\userApp\Selenium\chromedriver_win32\chromedriver.exe"
 
-import requests
-import lxml
-import re
-import xlsxwriter
-import pandas as pd
-import openpyxl as px
-import time
 
-import os, sys, pathlib
 current_dir = pathlib.Path(__file__).resolve().parent # このファイルのディレクトリの絶対パスを取得
 sys.path.append( str(current_dir) )
-import get_ipo_csv
 
 #指定された会社のIPOリストを取得する
 def kaisya_list(k_code,k_data,output_dir):
