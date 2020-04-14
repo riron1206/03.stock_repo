@@ -165,7 +165,7 @@ if __name__ == '__main__':
         # pandas_datareaderは1日に250回までしかAPI投げれないらしいので複数銘柄一気にとる
         # https://www.mazarimono.net/entry/2018/10/10/stocks
         df = web.DataReader(codes, args['source'], start, end)
-        out_csv = os.path.join(args['output_dir'], 'out_'+args['input_code_csv'])
+        out_csv = os.path.join(args['output_dir'], 'out_' + args['input_code_csv'])
         df.to_csv(out_csv)
         print("INFO: save file. [{}] {}".format(out_csv, df.shape))
 
@@ -198,10 +198,14 @@ if __name__ == '__main__':
         print("INFO: save file. [{}] {}".format(out_csv, df.shape))
 
         # チャート画像化
-        stock_df_plot_plotly(df["Close"], out_png=os.path.join(args['output_dir'], 'out_' + pathlib.Path(args['input_code_csv']).stem + '_Close.png'))
-        stock_df_plot_plotly(df["5MA"], out_png=os.path.join(args['output_dir'], 'out_' + pathlib.Path(args['input_code_csv']).stem + '_5MA.png'))
-        stock_df_plot_plotly(df["30MA"], out_png=os.path.join(args['output_dir'], 'out_' + pathlib.Path(args['input_code_csv']).stem + '_30MA.png'))
-        stock_df_plot_plotly(df["90MA"], out_png=os.path.join(args['output_dir'], 'out_' + pathlib.Path(args['input_code_csv']).stem + '_90MA.png'))
+        stock_df_plot_plotly(df["Close"], out_png=os.path.join(args['output_dir'],
+                             'out_' + pathlib.Path(args['input_code_csv']).stem + '_Close.png'))
+        stock_df_plot_plotly(df["5MA"], out_png=os.path.join(args['output_dir'],
+                             'out_' + pathlib.Path(args['input_code_csv']).stem + '_5MA.png'))
+        stock_df_plot_plotly(df["30MA"], out_png=os.path.join(args['output_dir'],
+                             'out_' + pathlib.Path(args['input_code_csv']).stem + '_30MA.png'))
+        stock_df_plot_plotly(df["90MA"], out_png=os.path.join(args['output_dir'],
+                             'out_' + pathlib.Path(args['input_code_csv']).stem + '_90MA.png'))
 
     else:
         # FREDからWilshire US REIT指数が取得。一日一本だけの価格
@@ -241,4 +245,5 @@ if __name__ == '__main__':
         # 5日と30日の移動平均線によるゴールデンクロス発生日から1日後に1株購入し、その後9日後に売った時の利益計算
         df = pd.read_csv(out_csv)
         df_profit = calc_golden_cross_profit(df, 'golden_cross_5MA_30MA', 1, 1 + 9,
-                                             out_png='golden_cross_profit_buy_gc_nday1_sell_gc_nday10')
+                                             out_png=os.path.join(args['output_dir'],
+                                                                  'golden_cross_profit_buy_gc_nday1_sell_gc_nday10'))
