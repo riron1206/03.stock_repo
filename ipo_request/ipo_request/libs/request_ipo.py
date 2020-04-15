@@ -34,6 +34,7 @@ def _compare_date(row, now):
     else:
         return None
 
+
 def get_request_ipo_info(master_csv:str, kaisya_csv:str):
     """
     ブックビル申込中のIPOの銘柄コードの情報取得

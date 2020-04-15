@@ -20,29 +20,26 @@ from openpyxl import load_workbook
 from selenium import webdriver
 from selenium.webdriver.firefox.options import Options
 
+current_dir = pathlib.Path(__file__).resolve().parent  # このファイルのディレクトリの絶対パスを取得
+sys.path.append(str(current_dir))
 import get_ipo_csv
-
 #from selenium.webdriver.chrome.options import Options
 #CHROMEDRIVER = r"C:\userApp\Selenium\chromedriver_win32\chromedriver.exe"
 
-
-current_dir = pathlib.Path(__file__).resolve().parent # このファイルのディレクトリの絶対パスを取得
-sys.path.append( str(current_dir) )
-
-#指定された会社のIPOリストを取得する
-def kaisya_list(k_code,k_data,output_dir):
+# 指定された会社のIPOリストを取得する
+def kaisya_list(k_code, k_data, output_dir):
     ipo_list = []
-    #ヘッドレスモードのオプションを設定する
+    # ヘッドレスモードのオプションを設定する
     options = Options()
-    #options.headless = True
+    # options.headless = True
     options.add_argument('--headless')
-    if k_code == "0": #マスタ
-        ipodata = get_ipo_csv.IpoData()#chromedriver=CHROMEDRIVER
+    if k_code == "0":  # マスタ
+        ipodata = get_ipo_csv.IpoData()  # chromedriver=CHROMEDRIVER
         dfs = ipodata.get_html_tables()
         ipodata.get_ipo_csv(dfs, output_csv=os.path.join(output_dir, 'master.csv'))
 
-    elif k_code == "1": #楽天証券
-        #seleniumで情報を取得し、bs4オブジェクトに変換する
+    elif k_code == "1":  # 楽天証券
+        # seleniumで情報を取得し、bs4オブジェクトに変換する
         driver = webdriver.Firefox(options=options)
         driver.get(k_data[1][1])
         url = driver.page_source

@@ -20,6 +20,7 @@ def kaisya_data(k_code, password_dir):
         config = yaml.load(f)
         sbi_USER_ID = config['sbi_USER_ID']
         sbi_PASSWORD = config['sbi_PASSWORD']
+        sbi_torihiki_pass = config['sbi_torihiki_pass']
     #################################
 
     #イベント管理エクセルの行番号を初期化
@@ -36,7 +37,7 @@ def kaisya_data(k_code, password_dir):
                    [row,"",""]],
 
               #ＳＢＩ証券
-              '2':[["sbi","",sbi_USER_ID,sbi_PASSWORD,""],
+              '2':[["sbi","", sbi_USER_ID, sbi_PASSWORD, sbi_torihiki_pass],
                    ["https://www.sbisec.co.jp/ETGate","https://www.sbisec.co.jp/ETGate/?OutSide=on&_ControlID=WPLETmgR001Control&_DataStoreID=DSWPLETmgR001Control&burl=search_domestic&dir=ipo%2F&file=stock_info_ipo.html&cat1=domestic&cat2=ipo&getFlg=on&int_pr1=150313_cmn_gnavi:6_dmenu_04"],
                    [row + 1,"",""]],
 
