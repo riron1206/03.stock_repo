@@ -1,7 +1,9 @@
 #! python3
 # -*- coding: utf-8 -*-
 """
+クロス取引を注文/取り消しを行う
 IPO銘柄の一覧を取得して申込む
+
 Usage:
     python ipo_list.py
 """
@@ -30,18 +32,17 @@ os.makedirs(output_dir, exist_ok=True)
 password_dir = args['password_dir']
 
 # ##メイン処理## #
-
 print("sbiでクロス取引を注文しますか？[y/N]")
 is_sbi_cross = input()
 if is_sbi_cross == 'y':
     k_data = kd.kaisya_data('2', password_dir)
-    print(k_data)
     cs.order_main(k_data, input_dir, output_dir)
 
     print("sbiで注文したクロス取引を取り消しますか？[y/N]")
     is_sbi_cross = input()
     if is_sbi_cross == 'y':
-        cs.cancel_main(k_data)
+        cs.CrossSbi(k_data).cancel_cross()
+    print("sbiで注文したクロス取引を取り消しました")
 
 k_codes = input("""★★IPO情報を更新する会社を全て選んでください★★:
             １：楽天証券

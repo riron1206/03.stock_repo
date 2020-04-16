@@ -1,25 +1,21 @@
 #! python3
 # -*- coding: utf-8 -*-
-#cross_sbi.py - ＳＢＩ証券でクロス取引を行う
-#引数は会社コードと会社データとする
-
-
+"""
+cross_sbi.py - ＳＢＩ証券でクロス取引を行う
+引数は会社コードと会社データとする
+"""
 import os
 import re
 import sys
-import traceback
+# import traceback
 from time import sleep
 
 import numpy as np
 import pandas as pd
-# 使用するモジュールのインポート
 from bs4 import BeautifulSoup as bs4
 from selenium import webdriver
-from selenium.webdriver.firefox.options import Options
 from selenium.webdriver.support.ui import Select
-
-options = Options()
-options.headless = True
+from tqdm import tqdm
 
 
 class CrossSbi():
@@ -29,10 +25,22 @@ class CrossSbi():
         現物買いと信用売り※（空売り）を、同じ株数・同じ値段で同時におこなうことを指します。
         同じ金額で買いと売りをおこなうので、損益は0円
     """
-    def __init__(self, k_data):
+    def __init__(self, k_data, chromedriver=None):
         self.k_data = k_data
+
+        # seleniumのドライバ
+        if chromedriver is not None:
+            from selenium.webdriver.chrome.options import Options
+            options = Options()
+            options.add_argument('--headless')
+            self.driver = webdriver.Chrome(chromedriver, options=options)
+        else:
+            from selenium.webdriver.firefox.options import Options
+            options = Options()
+            options.add_argument('--headless')
+            self.driver = webdriver.Firefox(options=options)
+
         # SBIにログインする
-        self.driver = webdriver.Firefox()
         self.driver.get(self.k_data[1][0])
         self.driver.find_element_by_name("user_id").send_keys(self.k_data[0][2])
         self.driver.find_element_by_name("user_password").send_keys(self.k_data[0][3])
@@ -45,15 +53,16 @@ class CrossSbi():
         sleep(0.5)
         self.driver.find_element_by_xpath("/html/body/div[1]/table/tbody/tr/td[1]/div[1]/table/tbody/tr/td[5]/a").click()
 
-        for i in self.driver.find_elements_by_link_text("取消"):
+        for i in tqdm(self.driver.find_elements_by_link_text("取消")):
             self.driver.find_element_by_link_text("取消").click()
             self.driver.find_element_by_name("trade_pwd").send_keys(self.k_data[0][4])
             self.driver.find_element_by_name("ACT_place").click()
             self.driver.find_element_by_link_text("取消・訂正").click()
+        self.driver.quit()
 
     def order_cross(self, order_count, order_lists, order_type, output_dir, buy_type):
         """ sbiでクロス取引を注文する """
-        for order_list in order_lists:
+        for order_list in tqdm(order_lists):
             # 注文画面に移動し注文する
             sleep(3)
             self.driver.find_element_by_xpath("//div[@id='link02']//img[@title='取引']").click()
@@ -61,10 +70,8 @@ class CrossSbi():
             self.driver.find_element_by_name("stock_sec_code").clear()
             self.driver.find_element_by_name("stock_sec_code").send_keys(order_list[0])
 
-            # 売買条件を設定する
+            # 売買条件を設定して信用売り/信用買い
             self.driver.find_element_by_id(buy_type).click()
-            # driver.find_element_by_id("shinU").click() 信用売り
-            # driver.find_element_by_id("shinK").click() 信用買い
 
             # 注文株数を入力する
             self.driver.find_element_by_name("input_quantity").clear()
@@ -131,18 +138,13 @@ class CrossSbi():
                     print("{}の結果取得に失敗しました".format(order_list[0]))
             else:
                 print("{}の注文に失敗している可能性があります。確認してください".format(order_list[0]))
-                traceback.print_exc()
+                # traceback.print_exc()
             sleep(2)
+        self.driver.quit()
         return
 
 
-def cancel_main(k_data):
-    cross_sbi = CrossSbi(k_data)
-    cross_sbi.cancel_cross()
-
-
 def order_main(k_data, input_dir, output_dir):
-    cross_sbi = CrossSbi(k_data)
     # ###################################ここから各社共通################################### #
     # 出力ファイルを読込みヘッダがなければヘッダを作成
     # ヘッダがある場合は処理継続
@@ -189,7 +191,7 @@ def order_main(k_data, input_dir, output_dir):
         print("{}で制度信用クロスを行います".format(k_data[0][0]))
         # order_typeとbuy_typeは会社によって変えてください
         order_type = 0
-        cross_sbi.order_cross(order_count, order_sedo, order_type, output_dir, r"shinU")
+        CrossSbi(k_data).order_cross(order_count, order_sedo, order_type, output_dir, r"shinU")
 
     # 一般信用取引の注文を行う
     if ippan_skip == "1":
@@ -198,7 +200,7 @@ def order_main(k_data, input_dir, output_dir):
         print("{}で一般信用クロスを行います".format(k_data[0][0]))
         # order_typeとbuy_typeは会社によって変えてください
         order_type = 1
-        cross_sbi.order_cross(order_count, order_ippan, order_type, output_dir, r"shinU")
+        CrossSbi(k_data).order_cross(order_count, order_ippan, order_type, output_dir, r"shinU")
 
     # ##################################ここから各社共通################################### #
     # 制度信用取引の注文を行う
@@ -219,7 +221,5 @@ def order_main(k_data, input_dir, output_dir):
             pass
 
     # order_typeとbuy_typeは会社によって変えてください
-    cross_sbi.order_cross(order_count, rinji_list, order_type, output_dir, r"shinK")
-
-    # driver.quit()
+    CrossSbi(k_data).order_cross(order_count, rinji_list, order_type, output_dir, r"shinK")
     # ###################################ここまで各社共通################################### #

@@ -29,13 +29,13 @@ def _compare_date(row, now):
     end = datetime.date(end.year, end.month, end.day)
 
     if start <= now <= end:
-        #print(start, now, end)
+        # print(start, now, end)
         return end
     else:
         return None
 
 
-def get_request_ipo_info(master_csv:str, kaisya_csv:str):
+def get_request_ipo_info(master_csv: str, kaisya_csv: str):
     """
     ブックビル申込中のIPOの銘柄コードの情報取得
     Args:
@@ -55,11 +55,11 @@ def get_request_ipo_info(master_csv:str, kaisya_csv:str):
 
     # ブックビル申込中（現在時刻の間）のレコードのみにする
     now = datetime.date.today()
-    #now = datetime.date(2020, 3, 15)# テスト用
+    # now = datetime.date(2020, 3, 15)# テスト用
     df_merge['within_date'] = df_merge.apply(_compare_date, now=now, axis='columns')
     df_merge = df_merge.dropna(subset=['within_date'])
     df_merge = df_merge.drop(['within_date'], axis=1)
-    #print(df_merge)
+    # print(df_merge)
     df_merge.columns = ['コード', '銘柄名', '申込開始日', '申込終了日', '当選本数', '最大価格']
     df_merge = df_merge.set_index('コード')
     return df_merge

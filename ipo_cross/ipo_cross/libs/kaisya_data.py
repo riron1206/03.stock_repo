@@ -1,21 +1,24 @@
 #! python3
 # -*- coding: utf-8 -*-
-#kaisya_data.py - 各会社のログイン情報を取得する
-#引数は会社コードとする
+"""
+kaisya_data.py - 各会社のログイン情報を取得する
+引数は会社コードとする
 
-#kaisya_dataの戻り値
-#0：ログイン情報       #1：アドレス情報           #2：Excel情報
-#0-0：会社名           #1-0：ログインアドレス     #2-0：Excel更新行
-#0-1：店舗コード        #1-1：IPO取得アドレス     #2-1：Excelアドレス（未定）
-#0-2：ユーザID
-#0-3：パスワード
-#0-4：取引パスワード
+kaisya_dataの戻り値
+0：ログイン情報       1：アドレス情報           2：Excel情報
+0-0：会社名           1-0：ログインアドレス     2-0：Excel更新行
+0-1：店舗コード       1-1：IPO取得アドレス      2-1：Excelアドレス（未定）
+0-2：ユーザID
+0-3：パスワード
+0-4：取引パスワード
+"""
 
-import os, yaml
+import os
+import yaml
 
-#会社コードから情報を取得し、会社データとして返す
+# 会社コードから情報を取得し、会社データとして返す
 def kaisya_data(k_code, password_dir):
-    ######## sbiログイン情報 ########
+    # ####### sbiログイン情報 ########
     with open(os.path.join(password_dir, 'sbi.yml')) as f:
         config = yaml.load(f)
         sbi_USER_ID = config['sbi_USER_ID']
@@ -23,7 +26,7 @@ def kaisya_data(k_code, password_dir):
         sbi_torihiki_pass = config['sbi_torihiki_pass']
     #################################
 
-    #イベント管理エクセルの行番号を初期化
+    # イベント管理エクセルの行番号を初期化
     row = 9
 
     k_dict = {#マスタ

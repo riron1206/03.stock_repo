@@ -1,5 +1,5 @@
 $ conda activate stock
-$ cd C:\Users\shingo\jupyter_notebook\stock_work\03.stock_repo\ipo_request\ipo_request
+$ cd C:\Users\shingo\jupyter_notebook\stock_work\03.stock_repo\ipo_cross\ipo_cross
 ### pyinstallerでビルド実行 ###
 # --onefileつけると自作モジュールなどの関連ファイルも含めてexe化する
 # --noconsoleつけると実行するexeがコマンドプロンプトを出さないようにする
@@ -18,7 +18,7 @@ sys.path.append(myLibPath)
 ### .spec使ってで再ビルド ###
 $ pyinstaller main.spec --onefile
 →dist\main.exeを
-　C:\Users\shingo\jupyter_notebook\stock_work\03.stock_repo\ipo_request\ipo_request
+　C:\Users\shingo\jupyter_notebook\stock_work\03.stock_repo\ipo_cross\ipo_cross
 　に移動させてから実行する
 　こうしないとmain.exeから一つ上の階層にあるpasswordディレクトリが参照できない
 　build,dist,main.specはもういらないから削除してもいい
