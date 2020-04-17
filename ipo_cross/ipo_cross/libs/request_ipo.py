@@ -8,6 +8,7 @@ Usage:
     call python regist_ipo.py
     pause
 """
+import sys
 import datetime
 import os
 from time import sleep
@@ -42,11 +43,15 @@ def get_request_ipo_info(master_csv: str, kaisya_csv: str):
         master_csv:ipoのマスター情報csv path
         kaisya_csv:各会社のipo情報csv path
     """
-    # ipoのマスター情報csv
-    df_master = pd.read_csv(master_csv, encoding="shift_jis", header=None)
+    try:
+        # ipoのマスター情報csv
+        df_master = pd.read_csv(master_csv, encoding="shift_jis", header=None)
+        # 各会社のipo情報csv
+        df_kaisya = pd.read_csv(kaisya_csv, encoding="shift_jis", header=None)
+    except pd.io.common.EmptyDataError:
+        print("申し込み可能なipo銘柄が0件なのでプログラムを終了します。")
+        sys.exit()
 
-    # 各会社のipo情報csv
-    df_kaisya = pd.read_csv(kaisya_csv, encoding="shift_jis", header=None)
     # 1列目のipo codeだけにする
     df_kaisya = df_kaisya[[0]]
 
@@ -89,13 +94,13 @@ class IpoRequest():
             code:ipoの銘柄番号
             price:入札する価格。Noneならストライクプライスで入れる
         """
-        ######## sbiログイン情報 ########
+        # ####### sbiログイン情報 ####### #
         with open(os.path.join(self.password_dir, 'sbi.yml')) as f:
             config = yaml.load(f)
             sbi_user_name = config['sbi_USER_ID']
             sbi_login_pass = config['sbi_PASSWORD']
             sbi_torihiki_pass = config['sbi_torihiki_pass']
-        #################################
+        # ############################### #
         # sbiのサイト
         self.driver.get(r"https://www.sbisec.co.jp/ETGate")
         # login
@@ -114,7 +119,7 @@ class IpoRequest():
             # 指定codeの申込ボタンクリック
             self.driver.find_element_by_xpath(f"//a[contains(@href,'{code}')]/img").click()
             sleep(1)
-            self.driver.find_element_by_name("suryo").send_keys("100") # 100株しか申し込めない
+            self.driver.find_element_by_name("suryo").send_keys("100")  # 100株しか申し込めない
 
             if price is None:
                 # ストライクプライス
@@ -127,20 +132,21 @@ class IpoRequest():
                 kakaku_select_element.select_by_value(f"{price}")
 
             self.driver.find_element_by_name("tr_pass").send_keys(sbi_torihiki_pass)
-            self.driver.find_element_by_name("order_kakunin").click() # 購入確認
-            self.driver.find_element_by_name("order_btn").click() # 購入実行
+            self.driver.find_element_by_name("order_kakunin").click()  # 購入確認
+            self.driver.find_element_by_name("order_btn").click()  # 購入実行
         except NoSuchElementException:
             # 申込ボタンがない場合
             print('すでに申込済みです')
-            raise # 呼び出し元に送信
+            raise  # 呼び出し元に送信
         finally:
-            self.driver.quit() # webページを閉じる
+            self.driver.quit()  # webページを閉じる
+
 
 if __name__ == '__main__':
     # IPO_register
     code = 4496
     price = 1350.0
     password_dir = 'password'
-    #CHROMEDRIVER = r"C:\userApp\Selenium\chromedriver_win32\chromedriver.exe"
+    # CHROMEDRIVER = r"C:\userApp\Selenium\chromedriver_win32\chromedriver.exe"
     ipo_request = IpoRequest(password_dir)#CHROMEDRIVER
     ipo_request.request_sbi_ipo(code, price)

@@ -19,52 +19,57 @@ from libs import request_ipo as ri
 
 # CHROMEDRIVER = r"C:\userApp\Selenium\chromedriver_win32\chromedriver.exe"
 parser = argparse.ArgumentParser()
-parser.add_argument("-i", "--input_dir", type=str, default='../input',
+parser.add_argument("-i", "--input_dir", type=str, default=None,
                     help="input dir path.")
 parser.add_argument("-o", "--output_dir", type=str, default='output',
                     help="output dir path.")
 parser.add_argument("-p", "--password_dir", type=str, default='../password',
                     help="password dir path.")
+parser.add_argument("-k_codes", "--kaisya_codes", type=str, default=None, nargs='*',
+                    help="ipo request stock company codes.")
 args = vars(parser.parse_args())
 input_dir = args['input_dir']
 output_dir = args['output_dir']
 os.makedirs(output_dir, exist_ok=True)
 password_dir = args['password_dir']
 
-# ##メイン処理## #
-print("sbiでクロス取引を注文しますか？[y/N]")
-is_sbi_cross = input()
-if is_sbi_cross == 'y':
-    k_data = kd.kaisya_data('2', password_dir)
-    cs.order_main(k_data, input_dir, output_dir)
-
-    print("sbiで注文したクロス取引を取り消しますか？[y/N]")
+if input_dir is not None:
+    print("sbiでクロス取引を注文しますか？[y/N]")
     is_sbi_cross = input()
     if is_sbi_cross == 'y':
-        cs.CrossSbi(k_data).cancel_cross()
-    print("sbiで注文したクロス取引を取り消しました")
+        k_data = kd.kaisya_data('2', password_dir)
+        cs.order_main(k_data, input_dir, output_dir)
 
-k_codes = input("""★★IPO情報を更新する会社を全て選んでください★★:
-            １：楽天証券
-            ２：ＳＢＩ証券
-            ３：ＳＭＢＣ日興証券
-            ４：マネックス証券
-            ５：松井証券
-            ６：ＧＭＯクリック証券
-            ７：野村証券
-            ８：ａｕカブコム証券
-            ９：大和証券
-            １０：東海東京証券
-            １１：岡三オンライン証券
-            １２：ＤＭＭ．ｃｏｍ証券
-            １３：岩井コスモ証券
-            １４：ライブスター証券（２銘柄以上の挙動確認）
-            １５：ストリーム（ＩＰＯなし）
-            １６：みずほ証券
-            １７：ＬＩＮＥ証券（ＩＰＯなし）
-            １８：ネオモバイル証券
-            ９９：ＡＬＬ
-番号を入力してください：""").split(",")
+        print("sbiで注文したクロス取引を取り消しますか？[y/N]")
+        is_sbi_cross = input()
+        if is_sbi_cross == 'y':
+            cs.CrossSbi(k_data).cancel_cross()
+        print("sbiで注文したクロス取引を取り消しました")
+
+if args['kaisya_codes'] is None:
+    k_codes = input("""★★IPO情報を更新する会社を全て選んでください★★:
+                １：楽天証券
+                ２：ＳＢＩ証券
+                ３：ＳＭＢＣ日興証券
+                ４：マネックス証券
+                ５：松井証券
+                ６：ＧＭＯクリック証券
+                ７：野村証券
+                ８：ａｕカブコム証券
+                ９：大和証券
+                １０：東海東京証券
+                １１：岡三オンライン証券
+                １２：ＤＭＭ．ｃｏｍ証券
+                １３：岩井コスモ証券
+                １４：ライブスター証券（２銘柄以上の挙動確認）
+                １５：ストリーム（ＩＰＯなし）
+                １６：みずほ証券
+                １７：ＬＩＮＥ証券（ＩＰＯなし）
+                １８：ネオモバイル証券
+                ９９：ＡＬＬ
+    番号を入力してください：""").split(",")
+else:
+    k_codes = args['kaisya_codes']
 
 # ALL指定の場合は全ての番号をループする（splitでリストになっている）
 if k_codes[0] == "99":
