@@ -18,6 +18,7 @@ dependencies:
   - click=7.1.1
   - colorama=0.4.3
   - cryptography=2.8
+  - cssselect=1.1.0
   - cycler=0.10.0
   - dash=1.9.1
   - dash-core-components=1.8.1
@@ -116,7 +117,9 @@ dependencies:
   - pyopenssl=19.1.0
   - pyparsing=2.4.6
   - pyqt=5.12.3
+  - pyquery=1.4.1
   - pyrsistent=0.16.0
+  - pysimplegui=4.18.2
   - pysocks=1.7.1
   - python=3.7.6
   - python-dateutil=2.8.1

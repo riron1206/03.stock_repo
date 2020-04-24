@@ -1,12 +1,15 @@
 $ conda activate stock
 $ cd C:\Users\shingo\jupyter_notebook\stock_work\03.stock_repo\ipo_cross\ipo_cross
-### pyinstallerでビルド実行 ###
+
+#-- pyinstallerでビルド実行 --#
 # --onefileつけると自作モジュールなどの関連ファイルも含めてexe化する
 # --noconsoleつけると実行するexeがコマンドプロンプトを出さないようにする
 # --cleanつけると古い実行ファイル(build,dist,main.spec)削除する
 $ pyinstaller ./main.py --onefile --clean
+$ pyinstaller ./ipo_PySimpleGUI.py --onefile --clean
 →build,dist,main.specができる
-→main.specを変更する
+
+#-- .specを変更する --#
 1. 3行目に下記コード追加
 ### 個人の./libsを認識するためのコード ###
 # https://qiita.com/cheuora/items/39b3203400e1e15248ed
@@ -15,9 +18,11 @@ myLibPath = './libs'
 sys.path.append(myLibPath)
 ##########################################
 2. 10行目を hiddenimports=['pkg_resources.py2_warn'], に変更
-### .spec使ってで再ビルド ###
+
+#-- .spec使ってで再ビルド --#
 $ pyinstaller main.spec --onefile
-→dist\main.exeを
+$ pyinstaller ipo_PySimpleGUI.spec --onefile
+→dist\*.exeを
 　C:\Users\shingo\jupyter_notebook\stock_work\03.stock_repo\ipo_cross\ipo_cross
 　に移動させてから実行する
 　こうしないとmain.exeから一つ上の階層にあるpasswordディレクトリが参照できない

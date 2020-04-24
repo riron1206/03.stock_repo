@@ -7,3 +7,5 @@ geckodriver.log
 /build/
 main.spec
 main.exe
+ipo_PySimpleGUI.spec
+ipo_PySimpleGUI.exe

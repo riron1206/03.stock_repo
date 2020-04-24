@@ -17,7 +17,8 @@ import argparse
 import datetime
 import os
 import pathlib
-
+from urllib.request import urlopen
+from bs4 import BeautifulSoup
 import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
@@ -130,6 +131,145 @@ def calc_golden_cross_profit(df, gc_col:str, buy_gc_nday:int, sell_gc_nday:int, 
     return df_profit
 
 
+def convert_brands_csv_to_1brand_df(csv, output_dir):
+    """
+    複数銘柄一括取得したcsvを個別銘柄単位でcsv作り直す
+    """
+    df = pd.read_csv(csv, skiprows=[2], header=[0, 1])
+
+    date_series = df.iloc[:, 0]
+    main_columns = ['code', 'date', 'open', 'high', 'low', 'close', 'volume', '5MA', '30MA', '90MA']
+    sub_columns = df['Open'].columns
+
+    for s_col in sub_columns:
+        brand_df = pd.DataFrame(columns=main_columns)
+        brand_df['date'] = date_series
+        brand_df['code'] = s_col.replace('.JP', '')
+        brand_df['open'] = df['Open'][s_col]
+        brand_df['high'] = df['High'][s_col]
+        brand_df['low'] = df['Low'][s_col]
+        brand_df['close'] = df['Close'][s_col]
+        brand_df['volume'] = df['Volume'][s_col]
+        brand_df['5MA'] = df['5MA'][s_col]
+        brand_df['30MA'] = df['30MA'][s_col]
+        brand_df['90MA'] = df['90MA'][s_col]
+        brand_df.to_csv(os.path.join(output_dir, s_col.replace('.JP', '') + '.csv'), index=False)
+
+
+def dl_recent_brand(code):
+    """
+    Beautiful Soup を使って、株探から最新の時系列データ（1レコード）を引っ張ってきます
+    https://note.com/tkmngn/n/nf5a0d548b909
+    Usage:
+        df = dl_recent_brand(4974)
+        df.to_csv(r'tmp\tmp.csv', index=False)
+    """
+    code = code.split('.')[0]  # .JPついてるので外す
+    try:
+        tgt = 'https://kabutan.jp/stock/kabuka?code=' + str(code)
+        html = urlopen(tgt)
+        bsObj = BeautifulSoup(html, 'html.parser')
+        table = bsObj.findAll('table', {'class': 'stock_kabuka0'})[0]
+        rows = table.findAll('tr')
+        for row in rows:
+            rec = []
+            for cell in row.findAll(['td', 'th']):
+                rec.append(cell.get_text())
+            del rec[5:7]
+            rec.insert(0, str(code))
+
+        # 最新の株価1レコードをデータフレームに詰める
+        _time = datetime.datetime.strptime('20' + rec[1], '%Y/%m/%d')
+        rec[1] = datetime.date(_time.year, _time.month, _time.day)
+        rec[2:] = [r.replace(',', '') for r in rec[2:]]
+        df = pd.DataFrame(rec).T
+        df = df.rename(columns={0: 'code', 1: 'Date', 2: 'Open', 3: 'High', 4: 'Low', 5: 'Close', 6: 'Volume'})
+
+        return df
+    except Exception as e:
+        return str(code) + ': ' + str(e)
+
+
+def dl_brands_csv(codes, args, start, end):
+    """
+    pandas_datareader で複数銘柄一括取得してcsvに保存する
+    """
+    # pandas_datareader は1日に250回までしかAPI投げれないらしいので複数銘柄一気にとる
+    # https://www.mazarimono.net/entry/2018/10/10/stocks
+    df = web.DataReader(codes, args['source'], start, end)
+    out_csv = os.path.join(args['output_dir'], 'out_' + args['input_code_csv'])
+    df.to_csv(out_csv)
+    print("INFO: save file. [{}] {}".format(out_csv, df.shape))
+
+    # 出力ファイルは階層型インデックスで扱いずらいからロードして編集
+    df = pd.read_csv(out_csv, skiprows=[2], header=[0, 1])
+    df.index = df["Attributes", "Symbols"]
+    df.index.name = 'Date'
+    df.index = pd.to_datetime(df.index)  # インデックスをDatetimeIndexに変換. pandas.DataFrame, pandas.Seriesのインデックスをdatetime64[ns]型にするとDatetimeIndexとみなされ、時系列データを処理する
+    df = df.drop(df.columns[[0]], axis=1)
+    df = df.reset_index()
+    df = df.set_index('Date', drop=False)  # Date列をindexにし、Date列は残す
+
+    # pandas_datareaderはなぜか期間指定が機能しないので指定する
+    df = df[(start <= df['Date']) & (df['Date'] <= end)]
+
+    try:
+        # 移動平均線計算.期間内のデータないときエラーになるからtryで囲む
+        dfclose = df["Close"]
+        for col in dfclose.columns:
+            df['5MA', col] = dfclose[col].rolling(window=5, min_periods=0).mean()
+        for col in dfclose.columns:
+            df['30MA', col] = dfclose[col].rolling(window=30, min_periods=0).mean()
+        for col in dfclose.columns:
+            df['90MA', col] = dfclose[col].rolling(window=90, min_periods=0).mean()
+    except Exception as e:
+        print("ERROR:", e)
+
+    df = df.set_index('Date')
+    df.to_csv(out_csv)
+    print("INFO: save file. [{}] {}".format(out_csv, df.shape))
+    return df
+
+
+def dl_1brand_csv(args, start, end):
+    """
+    pandas_datareader で1銘柄取得してcsvに保存する
+    ゴールデンクロスも計算する
+    """
+    # source=stooqなら日本株データも取れる
+    df = web.DataReader(args['brand'], args['source'], start, end)
+    df = df.reset_index()
+    df = df.set_index('Date', drop=False)  # Date列をindexにし、Date列は残す
+    df = df.sort_values(by=['Date'], ascending=True)  # Dateの昇順にする
+
+    # pandas_datareaderはなぜか期間指定が機能しないので指定する
+    df = df[(start <= df['Date']) & (df['Date'] <= end)]
+
+    # 最新データのレコード追加する
+    recent_df = dl_recent_brand(args['brand'])
+    recent_df = recent_df.set_index('Date', drop=False)  # Date列をindexにし、Date列は残す
+    recent_df = recent_df.drop('code', axis=1)  # code列は無いから消しとく
+    df = df.concat([df, recent_df])
+
+    try:
+        # 移動平均線計算.期間内のデータないときエラーになるからtryで囲む
+        df['5MA'] = df['Close'].rolling(window=5, min_periods=0).mean()
+        df['30MA'] = df['Close'].rolling(window=30, min_periods=0).mean()
+        df['90MA'] = df['Close'].rolling(window=90, min_periods=0).mean()
+    except Exception as e:
+        print("ERROR:", e)
+
+    # ゴールデンクロス列追加
+    df = add_golden_cross_col(df, av_short_col='5MA', av_long_col='30MA')
+    df = add_golden_cross_col(df, av_short_col='5MA', av_long_col='90MA')
+    df = add_golden_cross_col(df, av_short_col='30MA', av_long_col='90MA')
+
+    out_csv = os.path.join(args['output_dir'], args['brand'] + '.csv')
+    df.to_csv(out_csv, index=False)
+    print("INFO: save file. [{}] {}".format(out_csv, df.shape))
+    return df
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("-o", "--output_dir", type=str, default='output', help="output dir path.")
@@ -148,6 +288,7 @@ if __name__ == '__main__':
     else:
         end = datetime.datetime(args['end_year'], 1, 1)
 
+    # 複数銘柄の株価
     if args['input_code_csv'] is not None:
 
         dfcode = pd.read_csv(args['input_code_csv'])
@@ -156,46 +297,20 @@ if __name__ == '__main__':
         if args['source'] == 'stooq':
             # 日本株の場合.JPつける
             codes = [str(c) + '.JP' for c in codes]
+            print(codes)
 
         if 'name' in dfcode.columns.tolist():
             names = dfcode['name'].tolist()
-        print(codes)
-        print(names)
+            print(names)
 
         # pandas_datareaderは1日に250回までしかAPI投げれないらしいので複数銘柄一気にとる
-        # https://www.mazarimono.net/entry/2018/10/10/stocks
-        df = web.DataReader(codes, args['source'], start, end)
-        out_csv = os.path.join(args['output_dir'], 'out_' + args['input_code_csv'])
-        df.to_csv(out_csv)
-        print("INFO: save file. [{}] {}".format(out_csv, df.shape))
+        df = dl_brands_csv(codes, args, start, end)
 
-        # 出力ファイルは階層型インデックスで扱いずらいからロードして編集
-        df = pd.read_csv(out_csv, skiprows=[2], header=[0, 1])
-        df.index = df["Attributes", "Symbols"]
-        df.index.name = 'Date'
-        df.index = pd.to_datetime(df.index)  # インデックスをDatetimeIndexに変換. pandas.DataFrame, pandas.Seriesのインデックスをdatetime64[ns]型にするとDatetimeIndexとみなされ、時系列データを処理する
-        df = df.drop(df.columns[[0]], axis=1)
-        df = df.reset_index()
-        df.set_index('Date', drop=False)  # Date列をindexにし、Date列は残す
-
-        # pandas_datareaderはなぜか期間指定が機能しないので指定する
-        df = df[(start <= df['Date']) & (df['Date'] <= end)]
-
-        try:
-            # 移動平均線計算.期間内のデータないときエラーになるからtryで囲む
-            dfclose = df["Close"]
-            for col in dfclose.columns:
-                df['5MA', col] = dfclose[col].rolling(window=5, min_periods=0).mean()
-            for col in dfclose.columns:
-                df['30MA', col] = dfclose[col].rolling(window=30, min_periods=0).mean()
-            for col in dfclose.columns:
-                df['90MA', col] = dfclose[col].rolling(window=90, min_periods=0).mean()
-        except Exception as e:
-            print("ERROR:", e)
-
-        df = df.set_index('Date')
-        df.to_csv(out_csv)
-        print("INFO: save file. [{}] {}".format(out_csv, df.shape))
+        # 複数銘柄一括取得したcsvを個別銘柄単位でcsv作り直す
+        _csv = os.path.join(args['output_dir'], 'out_' + args['input_code_csv'])
+        _output_dir = os.path.join(args['output_dir'], pathlib.Path(_csv).stem)
+        os.makedirs(_output_dir, exist_ok=True)
+        convert_brands_csv_to_1brand_df(_csv, _output_dir)
 
         # チャート画像化
         stock_df_plot_plotly(df["Close"], out_png=os.path.join(args['output_dir'],
@@ -206,36 +321,13 @@ if __name__ == '__main__':
                              'out_' + pathlib.Path(args['input_code_csv']).stem + '_30MA.png'))
         stock_df_plot_plotly(df["90MA"], out_png=os.path.join(args['output_dir'],
                              'out_' + pathlib.Path(args['input_code_csv']).stem + '_90MA.png'))
-
+    # 1銘柄の株価
     else:
         # FREDからWilshire US REIT指数が取得。一日一本だけの価格
-        #df = web.DataReader('WILLREITIND', 'fred', start, end)
-        #df.to_csv(os.path.join(args['output_dir'], 'WILLREITIND.csv'), index=False)
+        # df = web.DataReader('WILLREITIND', 'fred', start, end)
+        # df.to_csv(os.path.join(args['output_dir'], 'WILLREITIND.csv'), index=False)
 
-        # source=stooqなら日本株データも取れる
-        df = web.DataReader(args['brand'], args['source'], start, end)
-        df = df.reset_index()
-        df.set_index('Date', drop=False)  # Date列をindexにし、Date列は残す
-        df = df.sort_values(by=['Date'], ascending=True)  # Dateの昇順にする
-
-        # pandas_datareaderはなぜか期間指定が機能しないので指定する
-        df = df[(start <= df['Date']) & (df['Date'] <= end)]
-        try:
-            # 移動平均線計算.期間内のデータないときエラーになるからtryで囲む
-            df['5MA'] = df['Close'].rolling(window=5, min_periods=0).mean()
-            df['30MA'] = df['Close'].rolling(window=30, min_periods=0).mean()
-            df['90MA'] = df['Close'].rolling(window=90, min_periods=0).mean()
-        except Exception as e:
-            print("ERROR:", e)
-
-        # ゴールデンクロス列追加
-        df = add_golden_cross_col(df, av_short_col='5MA', av_long_col='30MA')
-        df = add_golden_cross_col(df, av_short_col='5MA', av_long_col='90MA')
-        df = add_golden_cross_col(df, av_short_col='30MA', av_long_col='90MA')
-
-        out_csv = os.path.join(args['output_dir'], args['brand'] + '.csv')
-        df.to_csv(out_csv, index=False)
-        print("INFO: save file. [{}] {}".format(out_csv, df.shape))
+        df = dl_1brand_csv(args, start, end)
 
         # チャート画像化
         _df = df[['Date', 'Close', '5MA', '30MA', '90MA', 'golden_cross_5MA_30MA', 'golden_cross_5MA_90MA', 'golden_cross_30MA_90MA']]
@@ -243,7 +335,6 @@ if __name__ == '__main__':
         stock_df_plot_plotly(_df, out_png=os.path.join(args['output_dir'], args['brand'] + '.png'))
 
         # 5日と30日の移動平均線によるゴールデンクロス発生日から1日後に1株購入し、その後9日後に売った時の利益計算
-        df = pd.read_csv(out_csv)
         df_profit = calc_golden_cross_profit(df, 'golden_cross_5MA_30MA', 1, 1 + 9,
                                              out_png=os.path.join(args['output_dir'],
                                                                   'golden_cross_profit_buy_gc_nday1_sell_gc_nday10'))

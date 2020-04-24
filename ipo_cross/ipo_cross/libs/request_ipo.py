@@ -48,26 +48,27 @@ def get_request_ipo_info(master_csv: str, kaisya_csv: str):
         df_master = pd.read_csv(master_csv, encoding="shift_jis", header=None)
         # 各会社のipo情報csv
         df_kaisya = pd.read_csv(kaisya_csv, encoding="shift_jis", header=None)
+
+        # 1列目のipo codeだけにする
+        df_kaisya = df_kaisya[[0]]
+
+        # ipoのマスターと各会社のipo情報を内部結合
+        df_merge = pd.merge(df_master, df_kaisya, on=0)
+
+        # ブックビル申込中（現在時刻の間）のレコードのみにする
+        now = datetime.date.today()
+        # now = datetime.date(2020, 3, 15)# テスト用
+        df_merge['within_date'] = df_merge.apply(_compare_date, now=now, axis='columns')
+        df_merge = df_merge.dropna(subset=['within_date'])
+        df_merge = df_merge.drop(['within_date'], axis=1)
+        # print(df_merge)
+        df_merge.columns = ['コード', '銘柄名', '申込開始日', '申込終了日', '当選本数', '最大価格']
+        df_merge = df_merge.set_index('コード')
+        return df_merge
+
     except pd.io.common.EmptyDataError:
-        print("申し込み可能なipo銘柄が0件なのでプログラムを終了します。")
-        sys.exit()
-
-    # 1列目のipo codeだけにする
-    df_kaisya = df_kaisya[[0]]
-
-    # ipoのマスターと各会社のipo情報を内部結合
-    df_merge = pd.merge(df_master, df_kaisya, on=0)
-
-    # ブックビル申込中（現在時刻の間）のレコードのみにする
-    now = datetime.date.today()
-    # now = datetime.date(2020, 3, 15)# テスト用
-    df_merge['within_date'] = df_merge.apply(_compare_date, now=now, axis='columns')
-    df_merge = df_merge.dropna(subset=['within_date'])
-    df_merge = df_merge.drop(['within_date'], axis=1)
-    # print(df_merge)
-    df_merge.columns = ['コード', '銘柄名', '申込開始日', '申込終了日', '当選本数', '最大価格']
-    df_merge = df_merge.set_index('コード')
-    return df_merge
+        print("申し込み可能なipo銘柄が0件です。")
+        return pd.DataFrame()
 
 
 class IpoRequest():

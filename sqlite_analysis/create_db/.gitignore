@@ -2,5 +2,6 @@
 /__pycache__/
 /output/
 /old/
-/password/
+/.ipynb_checkpoints/
 geckodriver.log
+DB_Browser_for_SQLite
