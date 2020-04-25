@@ -37,4 +37,8 @@ call python no_060_apply_divide_union_data.py -db %MY_DB%
 @rem 営業利益を含む四半期ごとの決算情報スクレイピング + テーブルに情報追加。1時間ぐらいかかる
 call python no_070_quarterly_results.py -db %MY_DB% -dir %CSV_DIR3% -b_dir %CSV_DIR%
 
+
+@rem ログファイル作成。空行1行だけののファイル作成
+echo %date% %time% #### first create all end!!! #### > log.txt
+
 pause

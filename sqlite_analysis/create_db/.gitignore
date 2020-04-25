@@ -4,4 +4,5 @@
 /old/
 /.ipynb_checkpoints/
 geckodriver.log
-DB_Browser_for_SQLite
+DB_Browser_for_SQLite.lnk
+log.txt

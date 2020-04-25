@@ -15,4 +15,8 @@ call activate stock
 @rem これは3か月ごとの実行でいい
 call python no_070_quarterly_results.py -db %MY_DB% -dir %CSV_DIR3% -b_dir %CSV_DIR% -u
 
+@rem 空行1行追加
+echo. >> log.txt
+echo %date% %time% #### 3monthly update all end!!! #### >> log.txt 
+
 pause
