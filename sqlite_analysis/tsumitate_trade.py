@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-日経平均に連動するETFを毎月積み立てたときをsimulator.pyでテストする(buy_and_hold.pyの種銭毎月増やして毎月買って積立てる版)
+1銘柄を毎月積み立てたときをsimulator.pyでテストする(buy_and_hold.pyの種銭毎月増やして毎月買って積立てる版)
 https://github.com/BOSUKE/stock_and_python_book/blob/master/chapter3/nikkei_tsumitate_trade.py
 
 ＜シミュレーションの条件＞

@@ -167,7 +167,7 @@ class Portfolio(object):
         self.total_profit = 0  # 総利益（税引き前）
         self.total_tax = 0  # （源泉徴収)税金合計
         self.total_fee = 0  # 手数料合計
-        self.count_of_trades = 0 # トレード総数
+        self.count_of_trades = 0  # トレード総数
         self.count_of_wins = 0   # 勝ちトレード数
         self.total_gains = 0     # 総利益(損失分の相殺無しの値)
         self.total_losses = 0    # 総損出
