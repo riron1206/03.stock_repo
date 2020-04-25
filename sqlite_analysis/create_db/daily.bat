@@ -10,7 +10,6 @@ call activate stock
 
 @rem 空行1行追加
 echo. >> log.txt
-
 echo %date% %time% #### daily update start!!! #### >> log.txt
 
 

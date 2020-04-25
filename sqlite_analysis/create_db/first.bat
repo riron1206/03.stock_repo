@@ -38,7 +38,7 @@ call python no_060_apply_divide_union_data.py -db %MY_DB%
 call python no_070_quarterly_results.py -db %MY_DB% -dir %CSV_DIR3% -b_dir %CSV_DIR%
 
 
-@rem ログファイル作成。空行1行だけののファイル作成
+@rem ログファイル作成
 echo %date% %time% #### first create all end!!! #### > log.txt
 
 pause
