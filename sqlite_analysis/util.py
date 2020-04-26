@@ -87,10 +87,15 @@ def csv_to_table(csv_path, db_file_name=r'D:\DB_Browser_for_SQLite\stock.db', ta
         #     print(row)
 
 
-def table_to_df(table_name, db_file_name=r'D:\DB_Browser_for_SQLite\stock.db'):
+def table_to_df(table_name=None, sql=None, db_file_name=r'D:\DB_Browser_for_SQLite\stock.db'):
     """ sqlite3で指定テーブルのデータをDataFrameで返す """
     conn = sqlite3.connect(db_file_name)
-    return pd.read_sql(f'SELECT * FROM {table_name}', conn)
+    if table_name is not None:
+        return pd.read_sql(f'SELECT * FROM {table_name}', conn)
+    elif sql is not None:
+        return pd.read_sql(sql, conn)
+    else:
+        return None
 
 
 def fetch_prices_to_df(code, db_file_name=r'D:\DB_Browser_for_SQLite\stock.db', table_name='prices'):

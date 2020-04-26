@@ -15,13 +15,79 @@ Usage:
 """
 import datetime
 import argparse
+import sqlite3
+import numpy as np
+import pandas as pd
 
 import sys
 import pathlib
 current_dir = pathlib.Path(__file__).resolve().parent
 sys.path.append(str(current_dir))
 import simulator as sim
-from golden_core30 import create_stock_data
+# from golden_core30 import create_stock_data
+
+
+def pattern2(row):
+    """
+    追加の株価購入条件:
+    - 終値が5MA,25MAより上
+    - 終値が前日からの直近10日間の最大高値より上
+    - 出来高が前日比30%以上増
+    - 終値が当日の値幅の上位70%以上(大陽線?)
+    - 当日終値が25MA乖離率+5％未満
+    - 翌日始値-当日終値が0より大きい
+    """
+    if row['close'] >= row['5MA'] \
+        and row['close'] >= row['25MA'] \
+        and row['close'] >= row['high_shfi1_10MAX'] \
+        and row['volume_1diff_rate'] >= 0.3 \
+        and row['close'] >= ((row['high'] - row['low']) * 0.7) + row['low'] \
+        and (row['close'] - row['25MA']) / row['25MA'] < 0.05 \
+        and row['open_close_1diff'] > 0:
+        # return row
+        return 1
+    else:
+        # return pd.Series()
+        return 0
+
+
+def create_stock_data(db_file_name, code_list, start_date, end_date):
+    """指定した銘柄(code_list)それぞれの単元株数と日足(始値・終値 etc）を含む辞書を作成
+    """
+    stocks = {}
+    tse_index = sim.tse_date_range(start_date, end_date)
+    conn = sqlite3.connect(db_file_name)
+    for code in code_list:
+        unit = conn.execute('SELECT unit from brands WHERE code = ?',
+                            (code,)).fetchone()[0]
+        prices = pd.read_sql('SELECT * '
+                             'FROM prices '
+                             'WHERE code = ? AND date BETWEEN ? AND ?'
+                             'ORDER BY date',
+                             conn,
+                             params=(code, start_date, end_date),
+                             parse_dates=('date',),
+                             index_col='date')
+        # print(prices)
+
+        # ### plu_alpha #### #
+        prices['5MA'] = prices['close'].rolling(window=5).mean()
+        prices['25MA'] = prices['close'].rolling(window=25).mean()
+        prices['close_10MAX'] = prices['close'].rolling(window=10, min_periods=0).max()  # 直近10日間の中で最大終値
+        prices['high_10MAX'] = prices['high'].rolling(window=10, min_periods=0).max()  # 直近10日間の中で最大高値
+        prices['high_shfi1_10MAX'] = prices['high'].shift(1).fillna(0).rolling(window=10, min_periods=0).max()  # 前日からの直近10日間の中で最大高値
+        # prices['high_shfi1_15MAX'] = prices['high'].shift(1).fillna(0).rolling(window=15, min_periods=0).max()  # 前日からの直近15日間の中で最大高値
+        prices['volume_1diff_rate'] = (prices['volume'] - prices['volume'].shift(1).fillna(0)) / prices['volume']  # 前日比出来高
+        prices['open_close_1diff'] = prices['open'].shift(-1).fillna(0) - prices['close']  # 翌日始値-当日終値
+        # 購入フラグ付ける
+        prices['buy_flag'] = prices.apply(pattern2, axis=1)
+        ######################
+
+        # 株価が欠損のレコードもあるので
+        #  method='ffill'を使って、欠損している個所にもっとも近い個所にある有効なデーターで埋める
+        stocks[code] = {'unit': unit,
+                        'prices': prices.reindex(tse_index, method='ffill')}
+    return stocks
 
 
 def simulate_nikkei_tsumitate(db_file_name, start_date, end_date, deposit, reserve, code=1321):
@@ -33,11 +99,12 @@ def simulate_nikkei_tsumitate(db_file_name, start_date, end_date, deposit, reser
     """
     # stocksは1銘柄の指定期間について、{code: {unit: xxx, price: [date, open, close]のデータフレーム}}
     stocks = create_stock_data(db_file_name, (code,), start_date, end_date)
-    # print('stocks', stocks)
+    # print('stocks prices:', stocks[code]['prices'])
 
     def get_open_price_func(date, code):
         """指定日+指定銘柄の始値返す
         """
+        # print(date, type(date))
         return stocks[code]['prices']['open'][date]
 
     def get_close_price_func(date, code):
@@ -49,19 +116,20 @@ def simulate_nikkei_tsumitate(db_file_name, start_date, end_date, deposit, reser
 
     def trade_func(date, portfolio):
         """翌日の注文を決定する関数
+        dateはループで回している日にち
         """
-        # dateはループで回している日にち
-        # print('date', date)
-
         # 関数の内側から外側の変数へのアクセスは基本的に「参照」のみが可能
         # 値を更新するには nonlocal 宣言をしなくてはならない
         nonlocal  current_month
 
         if date.month != current_month:
-            # reserve分のお金を毎月加算していく
-            portfolio.add_deposit(reserve)
-            current_month = date.month
-            return [sim.BuyMarketOrderAsPossible(code, stocks[code]['unit'])]
+            portfolio.add_deposit(reserve)  # reserve分のお金を毎月加算していく
+            # current_month = date.month  # 月初めの購入フラグはコメントアウトして、やめていつでも金あれば買うようにする
+
+            _date = datetime.date(date.year, date.month, date.day)
+            if stocks[code]['prices']['buy_flag'][_date] == 1:  # 追加の株価購入条件もつける
+                return [sim.BuyMarketOrderAsPossible(code, stocks[code]['unit'])]  # 始値で買えるだけ買う
+
         return []
 
     return sim.simulate(start_date, end_date,

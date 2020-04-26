@@ -1,7 +1,8 @@
-@rem ä½œæˆæ—¥2020/04/23 DBæ—¥æ™‚æ›´æ–°batå®Ÿè¡Œã—ã¦ã€çµ‚äº†ã—ãŸã‚‰PCè½ã¨ã™
+@rem ì¬“ú2020/04/23 DB“úŽžXVbatŽÀs‚µ‚ÄAI—¹‚µ‚½‚çPC—Ž‚Æ‚·
 
-@rem daily.batå‘¼ã³å‡ºã™
+@rem daily.batŒÄ‚Ño‚·
 call daily.bat
 
-@rem ã‚·ãƒ£ãƒƒãƒˆãƒ€ã‚¦ãƒ³ã‚³ãƒžãƒ³ãƒ‰ ãƒ¡ãƒƒã‚»ãƒ¼ã‚¸ã‚’å‡ºåŠ›ã—20ç§’å¾Œã«ãƒ‘ã‚½ã‚³ãƒ³ã‚’é–‰ã˜ã¾ã™
-shutdown /s /t 20 /c "å¾Œ20ç§’ã§ã‚·ãƒ£ãƒƒãƒˆãƒ€ã‚¦ãƒ³ã—ã¾ã™ã€‚"
+@rem ƒVƒƒƒbƒgƒ_ƒEƒ“ƒRƒ}ƒ“ƒh ƒƒbƒZ[ƒW‚ðo—Í‚µ60•bŒã‚Éƒpƒ\ƒRƒ“‚ð•Â‚¶‚Ü‚·
+shutdown /s /t 60 /c "Œã60•b‚ÅƒVƒƒƒbƒgƒ_ƒEƒ“‚µ‚Ü‚·B"
+

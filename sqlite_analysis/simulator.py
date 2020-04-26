@@ -399,6 +399,7 @@ def simulate(start_date: int, end_date: int, deposit: int,
                           lambda code: get_open_price_func(d, code))
 
     order_list = []
+    # 市場が開いてる日を取得
     date_range = [pdate.to_pydatetime().date()
                   for pdate in tse_date_range(start_date, end_date)]
     for date in date_range[:-1]:

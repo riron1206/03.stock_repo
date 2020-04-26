@@ -12,7 +12,10 @@ https://github.com/BOSUKE/stock_and_python_book/blob/master/chapter3/golden_core
 
 Usage:
     $ activate stock
-    $ python golden_core30.py
+    # 日系225銘柄一気にやる
+    $ python ./golden_core30_plus_alpha.py -sd 20170101 -ed 20200424 -cs 7013 8304 3407 2502 2802 4503 6857 6113 6770 8267 7202 5019 8001 4208 4523 5201 9202 6472 9613 9437 6361 8725 2413 6103 9532 3861 4578 1802 6703 9007 6645 7733 4452 6952 1812 9107 7012 9503 2801 7751 6971 4151 2503 6326 3405 8253 9008 9009 9433 5406 1605 9766 4902 6301 1721 7186 4751 2501 3436 6674 5411 5020 6473 3086 4507 8355 4911 7762 1803 9104 4004 4063 8303 5401 9412 7735 7269 7270 5232 4005 5713 6302 8053 5802 8830 6724 1928 9735 4689 3382 2768 6758 8729 9984 8630 4568 8750 6367 1801 7912 4506 5541 5233 6976 1925 8601 8233 2531 4502 8331 4519 9502 8795 2432 3401 6762 4631 4543 4061 6902 4324 5301 9022 3289 8035 8766 9531 9005 8804 9501 4042 5332 9001 9602 5707 5901 3101 3402 5714 4043 7911 7203 8015 4704 7731 9021 2871 1963 4021 7201 2002 3105 6988 5202 5333 4272 5703 1332 6471 3863 5631 4041 2914 9062 6701 5214 9432 2282 6178 9101 8604 1808 6752 7832 9020 6305 6501 7004 7205 9983 6954 8028 8354 5803 6702 6504 4901 5108 5801 7267 8628 7261 8252 1333 8002 8411 7003 4183 5706 8309 8316 8031 8801 3099 4188 7211 7011 8058 9301 8802 6503 5711 8306 6479 2269 6506 9064 7951 7272 3103 6841 5101 6098 7752 8308
+    # 日経225連動型上場投資信託
+    $ python ./golden_core30_plus_alpha.py -sd 20170101 -ed 20200424 -cs 1321
 """
 import sqlite3
 import datetime
@@ -27,8 +30,32 @@ import simulator as sim
 import argparse
 
 
+def pattern2(row):
+    """
+    追加の株価購入条件:
+    - 終値が5MA,25MAより上
+    - 終値が前日からの直近10日間の最大高値より上
+    - 出来高が前日比30%以上増
+    - 終値が当日の値幅の上位70%以上(大陽線?)
+    - 当日終値が25MA乖離率+5％未満
+    - 翌日始値-当日終値が0より大きい
+    """
+    if row['close'] >= row['5MA'] \
+        and row['close'] >= row['25MA'] \
+        and row['close'] >= row['high_shfi1_10MAX'] \
+        and row['volume_1diff_rate'] >= 0.3 \
+        and row['close'] >= ((row['high'] - row['low']) * 0.7) + row['low'] \
+        and (row['close'] - row['25MA']) / row['25MA'] < 0.05 \
+        and row['open_close_1diff'] > 0:
+        # return row
+        return 1
+    else:
+        # return pd.Series()
+        return 0
+
+
 def create_stock_data(db_file_name, code_list, start_date, end_date):
-    """指定した銘柄(code_list)それぞれの単元株数と日足(始値・終値）を含む辞書を作成
+    """指定した銘柄(code_list)それぞれの単元株数と日足(始値・終値 etc）を含む辞書を作成
     """
     stocks = {}
     tse_index = sim.tse_date_range(start_date, end_date)
@@ -36,7 +63,7 @@ def create_stock_data(db_file_name, code_list, start_date, end_date):
     for code in code_list:
         unit = conn.execute('SELECT unit from brands WHERE code = ?',
                             (code,)).fetchone()[0]
-        prices = pd.read_sql('SELECT date, open, close '
+        prices = pd.read_sql('SELECT * '
                              'FROM prices '
                              'WHERE code = ? AND date BETWEEN ? AND ?'
                              'ORDER BY date',
@@ -45,6 +72,20 @@ def create_stock_data(db_file_name, code_list, start_date, end_date):
                              parse_dates=('date',),
                              index_col='date')
         # print(prices)
+
+        # ### plu_alpha #### #
+        prices['5MA'] = prices['close'].rolling(window=5).mean()
+        prices['25MA'] = prices['close'].rolling(window=25).mean()
+        prices['close_10MAX'] = prices['close'].rolling(window=10, min_periods=0).max()  # 直近10日間の中で最大終値
+        prices['high_10MAX'] = prices['high'].rolling(window=10, min_periods=0).max()  # 直近10日間の中で最大高値
+        prices['high_shfi1_10MAX'] = prices['high'].shift(1).fillna(0).rolling(window=10, min_periods=0).max()  # 前日からの直近10日間の中で最大高値
+        # prices['high_shfi1_15MAX'] = prices['high'].shift(1).fillna(0).rolling(window=15, min_periods=0).max()  # 前日からの直近15日間の中で最大高値
+        prices['volume_1diff_rate'] = (prices['volume'] - prices['volume'].shift(1).fillna(0)) / prices['volume']  # 前日比出来高
+        prices['open_close_1diff'] = prices['open'].shift(-1).fillna(0) - prices['close']  # 翌日始値-当日終値
+        # 購入フラグ付ける
+        prices['buy_flag'] = prices.apply(pattern2, axis=1)
+        ######################
+
         # 株価が欠損のレコードもあるので
         #  method='ffill'を使って、欠損している個所にもっとも近い個所にある有効なデーターで埋める
         stocks[code] = {'unit': unit,
@@ -126,14 +167,19 @@ def simulate_golden_dead_cross(db_file_name,
                     order_list.append(
                         sim.SellMarketOrder(code,
                                             portfolio.stocks[code].current_count))
-        # 保有していない株でgolden crossが発生していたら最低の単元数だけ買う
-        if date in golden_dict:
-            for code in golden_dict[date]:
-                if code not in portfolio.stocks:
-                    order_list.append(
-                        sim.BuyMarketOrderMoreThan(code,
-                                                   stocks[code]['unit'],
-                                                   order_under_limit))
+
+            # 保有していない株でgolden crossが発生していたら最低の単元数だけ買う
+            if date in golden_dict:
+                for code in golden_dict[date]:
+                    if code not in portfolio.stocks:
+
+                        _date = datetime.date(date.year, date.month, date.day)
+                        if stocks[code]['prices']['buy_flag'][_date] == 1:  # 追加の株価購入条件もつける
+
+                            order_list.append(
+                                sim.BuyMarketOrderMoreThan(code,
+                                                           stocks[code]['unit'],
+                                                           order_under_limit))
         return order_list
 
     return sim.simulate(start_date, end_date, deposit,

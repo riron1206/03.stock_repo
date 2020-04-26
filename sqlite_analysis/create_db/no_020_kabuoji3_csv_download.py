@@ -57,10 +57,16 @@ def download_stock_csv(code_range: list, save_dir: str, start_year: int, end_yea
 
 if __name__ == '__main__':
     ap = argparse.ArgumentParser()
-    ap.add_argument("-o", "--output_dir", type=str, default=r'D:\DB_Browser_for_SQLite\csvs\kabuoji3', help="output dir path.")
-    ap.add_argument("-s_y", "--start_year", type=int, default=1980, help="search start year.")
-    ap.add_argument("-e_y", "--end_year", type=int, default=None, help="search end year.")
-    ap.add_argument("-c", "--codes", type=int, nargs='*', default=None, help="brand code list.")
+    ap.add_argument("-o", "--output_dir", type=str, default=r'D:\DB_Browser_for_SQLite\csvs\kabuoji3',
+                    help="output dir path.")
+    ap.add_argument("-s_y", "--start_year", type=int, default=1980,
+                    help="search start year.")
+    ap.add_argument("-e_y", "--end_year", type=int, default=None,
+                    help="search end year.")
+    ap.add_argument("-c", "--codes", type=int, nargs='*', default=None,
+                    help="brand code list.")
+    ap.add_argument("-new", "--is_new_brands_only", action='store_const', const=True, default=False,
+                    help="get new_brands table codes csv.")
     args = vars(ap.parse_args())
 
     save_dir = args['output_dir']
@@ -72,11 +78,20 @@ if __name__ == '__main__':
     else:
         end_year = args['end_year']
 
-    if args['codes'] is None:
-        # codes=list(range(1301, 9998)) は無駄が多いのでDBから銘柄コード全件取る
-        brands = np.array(util.check_table('brands'))
-        codes = list(brands[:, 0])
+    if args['is_new_brands_only']:
+        # 新規上場のnew_brandsの銘柄だけ取る場合
+        today = datetime.datetime.today().strftime("%Y-%m-%d") # '2020-03-07'
+        sql = f"SELECT * FROM new_brands AS t WHERE t.date < '{today}'"
+        df_new_brands = util.table_to_df(sql=sql)
+        codes = df_new_brands['code'].to_list()
     else:
-        codes = args['codes']
+        if args['codes'] is None:
+            # 全銘柄取得する場合
+            # codes=list(range(1301, 9998)) は無駄が多いのでDBから銘柄コード全件取る
+            brands = np.array(util.check_table('brands'))
+            codes = list(brands[:, 0])
+        else:
+            # 指定銘柄だけ取得する場合
+            codes = args['codes']
 
     download_stock_csv(codes, save_dir, args['start_year'], end_year)
