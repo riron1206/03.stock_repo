@@ -35,6 +35,8 @@ https://github.com/BOSUKE/stock_and_python_book/blob/master/chapter4_5/simulator
 import math
 import collections
 import pandas as pd
+import warnings
+warnings.filterwarnings("ignore")
 
 import sys
 import pathlib

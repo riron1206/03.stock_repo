@@ -79,7 +79,6 @@ def create_stock_data(db_file_name, code_list, start_date, end_date):
         prices['close_10MAX'] = prices['close'].rolling(window=10, min_periods=0).max()  # 直近10日間の中で最大終値
         prices['high_10MAX'] = prices['high'].rolling(window=10, min_periods=0).max()  # 直近10日間の中で最大高値
         prices['high_shfi1_10MAX'] = prices['high'].shift(1).fillna(0).rolling(window=10, min_periods=0).max()  # 前日からの直近10日間の中で最大高値
-        # prices['high_shfi1_15MAX'] = prices['high'].shift(1).fillna(0).rolling(window=15, min_periods=0).max()  # 前日からの直近15日間の中で最大高値
         prices['volume_1diff_rate'] = (prices['volume'] - prices['volume'].shift(1).fillna(0)) / prices['volume']  # 前日比出来高
         prices['open_close_1diff'] = prices['open'].shift(-1).fillna(0) - prices['close']  # 翌日始値-当日終値
         # 購入フラグ付ける
@@ -173,8 +172,9 @@ def simulate_golden_dead_cross(db_file_name,
                 for code in golden_dict[date]:
                     if code not in portfolio.stocks:
 
+                        # 追加の株価購入条件もつける
                         _date = datetime.date(date.year, date.month, date.day)
-                        if stocks[code]['prices']['buy_flag'][_date] == 1:  # 追加の株価購入条件もつける
+                        if stocks[code]['prices']['buy_flag'][_date] == 1:
 
                             order_list.append(
                                 sim.BuyMarketOrderMoreThan(code,
@@ -192,9 +192,9 @@ def get_args():
     ap.add_argument("-db", "--db_file_name", type=str, default=r'D:\DB_Browser_for_SQLite\stock.db',
                     help="sqlite db file path.")
     ap.add_argument("-sd", "--start_date", type=str, default='20100401',
-                    help="start day (yyyy/mm/dd).")
+                    help="start day (yyyymmdd).")
     ap.add_argument("-ed", "--end_date", type=str, default='20200401',
-                    help="end day (yyyy/mm/dd).")
+                    help="end day (yyyymmdd).")
     ap.add_argument("-dep", "--deposit", type=int, default=1000000,
                     help="deposit money.")
     ap.add_argument("-cs", "--codes", type=int, nargs='*',
@@ -240,4 +240,19 @@ if __name__ == '__main__':
     print('（源泉徴収)税金合計:', portfolio.total_tax)
     print('手数料合計:', portfolio.total_fee)
     print('保有銘柄 銘柄コード:', portfolio.stocks)
+    # 日々の収益率を求める
+    returns = (result.profit - result.profit.shift(1)) / result.price.shift(1)
+    # 評価指標
+    print('勝率:', round(portfolio.calc_winning_percentage(), 3), '%')  # 勝ちトレード回数/全トレード回数
+    print('ペイオフレシオ:', portfolio.calc_payoff_ratio())  # 損益率: 勝ちトレードの平均利益額/負けトレードの平均損失額
+    print('プロフィットファクター:', portfolio.calc_payoff_ratio())  # 総利益/総損失
+    print('最大ドローダウン:', round(sim.calc_max_drawdown(result['price']), 5))  # 累計利益または総資産額の最大落ち込み%。50%という値が出た場合、その戦略は使えない
+    # リスクを考慮した評価指標
+    # ※実装した指標の関数は、異なる売買戦略のシミュレーション結果を比較するためだけに利用すること
+    # 　証券会社のサイトにもシャープレシオなどは載っているが、計算方法の前提が違う
+    # 　計算方法がを比べても意味がない
+    print('シャープレシオ:', round(sim.calc_sharp_ratio(returns), 5))  # リスク(株価のばらつき)に対するリターンの大きさ。0.5～0.9で普通、1.0～1.9で優秀、2.0以上だと大変優秀
+    # print('インフォメーションレシオ:', sim.calc_information_ratio(returns, benchmark_retruns))  # 「リスクに対し、ベンチマークに対する超過リターンがどの程度か」を示す値
+    print('ソルティノレシオ:', round(sim.calc_sortino_ratio(returns), 5))  # シャープレシオだけでは分からない下落リスクの抑制度合い
+    print('カルマーレシオ:', round(sim.calc_calmar_ratio(returns, returns), 5))  # 同じ安全さに対してどれだけ利益を上げられそうかという指標。運用実績がより良いことを示す
     print()

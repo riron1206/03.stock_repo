@@ -11,6 +11,7 @@ https://github.com/BOSUKE/stock_and_python_book/blob/master/chapter3/buy_and_hol
 Usage:
     $ activate stock
     $ python buy_and_hold.py
+    $ python buy_and_hold.py -sd 20170101
 """
 import argparse
 import datetime
@@ -68,9 +69,9 @@ def get_args():
     ap.add_argument("-db", "--db_file_name", type=str, default=r'D:\DB_Browser_for_SQLite\stock.db',
                     help="sqlite db file path.")
     ap.add_argument("-sd", "--start_date", type=str, default='20100401',
-                    help="start day (yyyy/mm/dd).")
+                    help="start day (yyyymmdd).")
     ap.add_argument("-ed", "--end_date", type=str, default='20200401',
-                    help="end day (yyyy/mm/dd).")
+                    help="end day (yyyymmdd).")
     ap.add_argument("-dep", "--deposit", type=int, default=1000000,
                     help="deposit money.")
     ap.add_argument("-c", "--code", type=int, default=1344,
@@ -109,4 +110,19 @@ if __name__ == '__main__':
     print('（源泉徴収)税金合計:', portfolio.total_tax)
     print('手数料合計:', portfolio.total_fee)
     print('保有銘柄 銘柄コード:', portfolio.stocks)
+    # 日々の収益率を求める
+    returns = (result.profit - result.profit.shift(1)) / result.price.shift(1)
+    # 評価指標
+    print('勝率:', round(portfolio.calc_winning_percentage(), 3), '%')  # 勝ちトレード回数/全トレード回数
+    print('ペイオフレシオ:', portfolio.calc_payoff_ratio())  # 損益率: 勝ちトレードの平均利益額/負けトレードの平均損失額
+    print('プロフィットファクター:', portfolio.calc_payoff_ratio())  # 総利益/総損失
+    print('最大ドローダウン:', round(sim.calc_max_drawdown(result['price']), 5))  # 累計利益または総資産額の最大落ち込み%。50%という値が出た場合、その戦略は使えない
+    # リスクを考慮した評価指標
+    # ※実装した指標の関数は、異なる売買戦略のシミュレーション結果を比較するためだけに利用すること
+    # 　証券会社のサイトにもシャープレシオなどは載っているが、計算方法の前提が違う
+    # 　計算方法がを比べても意味がない
+    print('シャープレシオ:', round(sim.calc_sharp_ratio(returns), 5))  # リスク(株価のばらつき)に対するリターンの大きさ。0.5～0.9で普通、1.0～1.9で優秀、2.0以上だと大変優秀
+    # print('インフォメーションレシオ:', sim.calc_information_ratio(returns, benchmark_retruns))  # 「リスクに対し、ベンチマークに対する超過リターンがどの程度か」を示す値
+    print('ソルティノレシオ:', round(sim.calc_sortino_ratio(returns), 5))  # シャープレシオだけでは分からない下落リスクの抑制度合い
+    print('カルマーレシオ:', round(sim.calc_calmar_ratio(returns, returns), 5))  # 同じ安全さに対してどれだけ利益を上げられそうかという指標。運用実績がより良いことを示す
     print()
