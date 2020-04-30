@@ -24,14 +24,30 @@ Usage:
 """
 import argparse
 import csv
-import glob
 import datetime
+import glob
 import os
 import sqlite3
 import time
 import traceback
 from tqdm import tqdm
 import pandas as pd
+
+# 公開プロキシのファイルあるか
+import json
+import pathlib
+import random
+import requests
+import warnings
+warnings.filterwarnings("ignore")
+current_dir = pathlib.Path(__file__).resolve().parent
+PROXIES_PATH = os.path.join(current_dir, 'proxies.json')
+http_ips, https_ips = [], []
+# # 公開プロキシ介すると遅いし失敗することあるのでやめておく
+# if os.path.exists(PROXIES_PATH):
+#     json_load = json.load(open(PROXIES_PATH, 'r'))
+#     http_ips = [s for s in json_load if 'http://' in s if ':3128' in s]
+#     https_ips = [s for s in json_load if 'https://' in s if ':3128' in s]
 
 
 def insert_recent_data_and_save_csv(db_file_name, code, table_names=['raw_prices', 'prices'], csv_file=None):
@@ -42,8 +58,19 @@ def insert_recent_data_and_save_csv(db_file_name, code, table_names=['raw_prices
     """
     # time.sleep(2)  # 1銘柄のスクレイピングに2秒間隔開ける。サーバに負荷かけて逮捕されないために
     try:
-        df = pd.read_html(f'https://kabuoji3.com/stock/{code}/')[0]
+        url = f'https://kabuoji3.com/stock/{code}/'
 
+        # Referrer指定して、直前になんのサイトを見ていたかを偽装する。一応、使っているブラウザのUserAgentも明記する。Googleで検索する際に、"my useragent"と入力すると、Googleが今使っているブラウザのUserAgentを教えてくれる
+        headers = {"referer": "https://google.com",
+                   "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/81.0.4044.122 Safari/537.36"}
+        if len(http_ips) > 0:
+            proxies = {"https": random.choice(https_ips) + "/"}  # プロキシサーバ経由してIPアドレス偽装する
+            response = requests.get(url=url, headers=headers, proxies=proxies, verify=False)  # verify=Falseで証明書の警告を無視
+        else:
+            response = requests.get(url=url, headers=headers)
+        html = response.content
+
+        df = pd.read_html(html)[0]  # df = pd.read_html(url)[0]でもいけるがIP情報など偽装するために requests かます
         if csv_file is not None:
             csv_df = pd.read_csv(csv_file, encoding='shift-jis')
             csv_last_date = csv_df.loc[csv_df.shape[0] - 1]['日付']  # 2020-04-13形式の文字列

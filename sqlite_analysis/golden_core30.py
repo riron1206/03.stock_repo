@@ -199,9 +199,9 @@ if __name__ == '__main__':
     returns = (result.profit - result.profit.shift(1)) / result.price.shift(1)
     # 評価指標
     print('勝率:', round(portfolio.calc_winning_percentage(), 3), '%')  # 勝ちトレード回数/全トレード回数
-    print('ペイオフレシオ:', portfolio.calc_payoff_ratio())  # 損益率: 勝ちトレードの平均利益額/負けトレードの平均損失額
-    print('プロフィットファクター:', portfolio.calc_payoff_ratio())  # 総利益/総損失
-    print('最大ドローダウン:', round(sim.calc_max_drawdown(result['price']), 5))  # 累計利益または総資産額の最大落ち込み%。50%という値が出た場合、その戦略は使えない
+    print('ペイオフレシオ:', round(portfolio.calc_payoff_ratio(), 5))  # 損益率: 勝ちトレードの平均利益額/負けトレードの平均損失額
+    print('プロフィットファクター:', round(portfolio.calc_profit_factor(), 5))  # 総利益/総損失
+    print('最大ドローダウン:', round(sim.calc_max_drawdown(result['price']) * 100, 3), '%')  # 累計利益または総資産額の最大落ち込み%。50%という値が出た場合、その戦略は使えない
     # リスクを考慮した評価指標
     # ※実装した指標の関数は、異なる売買戦略のシミュレーション結果を比較するためだけに利用すること
     # 　証券会社のサイトにもシャープレシオなどは載っているが、計算方法の前提が違う

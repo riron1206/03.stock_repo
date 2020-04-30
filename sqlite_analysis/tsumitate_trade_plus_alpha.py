@@ -77,7 +77,7 @@ def create_stock_data(db_file_name, code_list, start_date, end_date):
         prices['high_10MAX'] = prices['high'].rolling(window=10, min_periods=0).max()  # 直近10日間の中で最大高値
         prices['high_shfi1_10MAX'] = prices['high'].shift(1).fillna(0).rolling(window=10, min_periods=0).max()  # 前日からの直近10日間の中で最大高値
         # prices['high_shfi1_15MAX'] = prices['high'].shift(1).fillna(0).rolling(window=15, min_periods=0).max()  # 前日からの直近15日間の中で最大高値
-        prices['volume_1diff_rate'] = (prices['volume'] - prices['volume'].shift(1).fillna(0)) / prices['volume']  # 前日比出来高
+        prices['volume_1diff_rate'] = (prices['volume'] - prices['volume'].shift(1).fillna(0)) / prices['volume'].shift(1).fillna(0)  # 前日比出来高
         prices['open_close_1diff'] = prices['open'].shift(-1).fillna(0) - prices['close']  # 翌日始値-当日終値
         # 購入フラグ付ける
         prices['buy_flag'] = prices.apply(pattern2, axis=1)
@@ -197,9 +197,9 @@ if __name__ == '__main__':
     returns = (result.profit - result.profit.shift(1)) / result.price.shift(1)
     # 評価指標
     print('勝率:', round(portfolio.calc_winning_percentage(), 3), '%')  # 勝ちトレード回数/全トレード回数
-    print('ペイオフレシオ:', portfolio.calc_payoff_ratio())  # 損益率: 勝ちトレードの平均利益額/負けトレードの平均損失額
-    print('プロフィットファクター:', portfolio.calc_payoff_ratio())  # 総利益/総損失
-    print('最大ドローダウン:', round(sim.calc_max_drawdown(result['price']), 5))  # 累計利益または総資産額の最大落ち込み%。50%という値が出た場合、その戦略は使えない
+    print('ペイオフレシオ:', round(portfolio.calc_payoff_ratio(), 5))  # 損益率: 勝ちトレードの平均利益額/負けトレードの平均損失額
+    print('プロフィットファクター:', round(portfolio.calc_profit_factor(), 5))  # 総利益/総損失
+    print('最大ドローダウン:', round(sim.calc_max_drawdown(result['price']) * 100, 3), '%')  # 累計利益または総資産額の最大落ち込み%。50%という値が出た場合、その戦略は使えない
     # リスクを考慮した評価指標
     # ※実装した指標の関数は、異なる売買戦略のシミュレーション結果を比較するためだけに利用すること
     # 　証券会社のサイトにもシャープレシオなどは載っているが、計算方法の前提が違う

@@ -8,6 +8,11 @@ set CSV_DIR3=D:\DB_Browser_for_SQLite\csvs\kabutan_quarterly
 
 call activate stock
 
+@rem 上場・廃止銘柄スクレイピング + 上場テーブルと廃止テーブルに銘柄追加 + 銘柄情報テーブルに上場銘柄追加（廃止銘柄は消さずに残す）
+@rem これは3か月ごとの実行でいいと思う
+call python no_030_get_new_delete_brands_info.py -db %MY_DB%
+echo %date% %time% no_030_get_new_delete_brands_info.py end. >> log.txt
+
 @rem 全テーブル更新する場合はdaily.bat呼び出す
 @rem call daily.bat
 

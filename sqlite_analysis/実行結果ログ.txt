@@ -102,6 +102,13 @@ $ python ./rating_trade_plus_alpha.py -sd 20170101 -ed 20200426
 （源泉徴収)税金合計: 434161
 手数料合計: 32837
 保有銘柄 銘柄コード: defaultdict(<class 'simulator.OwnedStock'>, {})
+勝率: 54.839 %
+ペイオフレシオ: 1.6485593728410888
+プロフィットファクター: 1.6485593728410888
+最大ドローダウン: 0.30692
+シャープレシオ: 0.04562
+ソルティノレシオ: 0.07274
+カルマーレシオ: 0.00058
 
 
 $ python ./rating_trade.py -sd 20171231 -ed 20200426
@@ -124,3 +131,37 @@ $ python ./rating_trade.py -sd 20170101 -ed 20200426
 保有銘柄 銘柄コード: defaultdict(<class 'simulator.OwnedStock'>, {})
 
 
+#####################
+20200430
+
+(stock) C:\Users\shingo\jupyter_notebook\stock_work\03.stock_repo\sqlite_analysis>python ./original_trade.py -sd 20151101 -ed 20200101
+
+現在の預り金: 1181161
+投資総額: 1000000
+総利益（税引き前）: 223409
+（源泉徴収)税金合計: 45385
+手数料合計: 11024
+保有銘柄 銘柄コード: defaultdict(<class 'simulator.OwnedStock'>, {})
+勝率: 58.974 %
+ペイオフレシオ: 1.08947
+プロフィットファクター: 1.56611
+最大ドローダウン: 23.543 %
+シャープレシオ: 0.02461
+ソルティノレシオ: 0.03455
+カルマーレシオ: 0.0001
+
+
+(stock) C:\Users\shingo\jupyter_notebook\stock_work\03.stock_repo\sqlite_analysis>python ./original_trade.py -sd 20150101
+現在の預り金: 743513
+投資総額: 1000000
+総利益（税引き前）: -259611
+（源泉徴収)税金合計: 0
+手数料合計: 12787
+保有銘柄 銘柄コード: defaultdict(<class 'simulator.OwnedStock'>, {})
+勝率: 43.478 %
+ペイオフレシオ: 0.85494
+プロフィットファクター: 0.65764
+最大ドローダウン: 36.357 %
+シャープレシオ: -0.01716
+ソルティノレシオ: -0.02318
+カルマーレシオ: -6e-05

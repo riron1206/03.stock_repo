@@ -42,6 +42,22 @@ today = datetime.datetime.today().strftime("%Y-%m-%d")  # '2020-03-07'
 str_year = today[:4]
 str_month = today[5:7]
 
+# 公開プロキシのファイルあるか
+import json
+import pathlib
+import random
+import requests
+import warnings
+warnings.filterwarnings("ignore")
+current_dir = pathlib.Path(__file__).resolve().parent
+PROXIES_PATH = os.path.join(current_dir, 'proxies.json')
+http_ips, https_ips = [], []
+# # 公開プロキシ介すると遅いし失敗することあるのでやめておく
+# if os.path.exists(PROXIES_PATH):
+#     json_load = json.load(open(PROXIES_PATH, 'r'))
+#     http_ips = [s for s in json_load if 'http://' in s if ':3128' in s]
+#     https_ips = [s for s in json_load if 'https://' in s if ':3128' in s]
+
 
 def edit_rating_df(df, yyyy, mm, save_dir):
     """ rating情報データフレームを加工する """
@@ -91,7 +107,19 @@ def download_recent_rating_csv(save_dir):
     ※トレーダーズ・ウェブはスクレイピング許可されてない（はず）。やりすぎると逮捕されかねないので注意
     """
     try:
-        dfs = pd.read_html('https://www.traders.co.jp/domestic_stocks/domestic_market/attention_rating/attention_rating.asp')
+        url = 'https://www.traders.co.jp/domestic_stocks/domestic_market/attention_rating/attention_rating.asp'
+
+        # Referrer指定して、直前になんのサイトを見ていたかを偽装する。一応、使っているブラウザのUserAgentも明記する。Googleで検索する際に、"my useragent"と入力すると、Googleが今使っているブラウザのUserAgentを教えてくれる
+        headers = {"referer": "https://google.com",
+                   "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/81.0.4044.122 Safari/537.36"}
+        if len(http_ips) > 0:
+            proxies = {"https": random.choice(http_ips) + "/"}  # プロキシサーバ経由してIPアドレス偽装する
+            response = requests.get(url=url, headers=headers, proxies=proxies, verify=False)  # verify=Falseで証明書の警告を無視
+        else:
+            response = requests.get(url=url, headers=headers)
+        html = response.content
+
+        dfs = pd.read_html(html)  # dfs = pd.read_html(url)でもいけるがIP情報など偽装するために requests かます
         for df in dfs:
             if set(df.loc[0].to_list()) == set(['日付', 'コード', '市場', '銘柄名', 'シンクタンク', 'レーティング', 'ターゲット']):
                 break
@@ -113,7 +141,19 @@ def download_old_rating_csv(yyyy, mm, save_dir):
     ※トレーダーズ・ウェブはスクレイピング許可されてない（はず）。やりすぎると逮捕されかねないので注意
     """
     try:  # トレーダーズ・ウェブがエラーになる場合があったのでtryで囲む
-        dfs = pd.read_html(f'https://www.traders.co.jp/domestic_stocks/domestic_market/attention_rating/attention_rating_bn.asp?BN={yyyy}{mm}')
+        url = f'https://www.traders.co.jp/domestic_stocks/domestic_market/attention_rating/attention_rating_bn.asp?BN={yyyy}{mm}'
+
+        # Referrer指定して、直前になんのサイトを見ていたかを偽装する。一応、使っているブラウザのUserAgentも明記する。Googleで検索する際に、"my useragent"と入力すると、Googleが今使っているブラウザのUserAgentを教えてくれる
+        headers = {"referer": "https://google.com",
+                   "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/81.0.4044.122 Safari/537.36"}
+        if len(http_ips) > 0:
+            proxies = {"https": random.choice(http_ips) + "/"}  # プロキシサーバ経由してIPアドレス偽装する
+            response = requests.get(url=url, headers=headers, proxies=proxies, verify=False)  # verify=Falseで証明書の警告を無視
+        else:
+            response = requests.get(url=url, headers=headers)
+        html = response.content
+
+        dfs = pd.read_html(html)  # dfs = pd.read_html(url)でもいけるがIP情報など偽装するために requests かます
         for df in dfs:
             if set(df.loc[0].to_list()) == set(['日付', 'コード', '市場', '銘柄名', 'シンクタンク', 'レーティング', 'ターゲット']):
                 break

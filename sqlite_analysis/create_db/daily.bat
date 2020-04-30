@@ -13,9 +13,9 @@ echo. >> log.txt
 echo %date% %time% #### daily update start!!! #### >> log.txt
 
 
-@rem 上場・廃止銘柄スクレイピング + 上場テーブルと廃止テーブルに銘柄追加 + 銘柄情報テーブルに上場銘柄追加（廃止銘柄は消さずに残す）
-call python no_030_get_new_delete_brands_info.py -db %MY_DB%
-echo %date% %time% no_030_get_new_delete_brands_info.py end. >> log.txt
+@rem 公開プロキシのIPアドレスを取得。公開プロキシ介すると遅いし失敗することあるのでやめておく
+@rem call python get_free_proxy.py
+@rem echo %date% %time% get_free_proxy.py end. >> log.txt
 
 
 @rem 最新株価スクレイピング + 新規レコードcsvに追加 + 株価テーブルに株価追加。-uで最新株価のみ追加する。1銘柄1件づつ追加する場合1時間ぐらいかかる
@@ -39,3 +39,5 @@ echo %date% %time% no_060_apply_divide_union_data.py end. >> log.txt
 
 
 echo %date% %time% #### daily update all end!!! #### >> log.txt 
+
+@rem pause

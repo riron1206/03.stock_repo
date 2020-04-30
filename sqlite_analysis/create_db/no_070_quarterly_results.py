@@ -60,7 +60,8 @@ def download_quarterly_csv(code, save_dir=None, csv_path=None):
     株探（https://kabutan.jp/）から3ヵ月決算【実績】をスクレイピングして保存して、データフレームを返す
     業績の単位は「百万円」
     csvファイルのパスを渡す場合はそのcsvに新規レコード追加する
-    ※株探の各銘柄の業績ページはスクレイピング禁止されていない（許可されているわけではない）が。やりすぎると逮捕されかねないので注意
+    ※https://kabutan.jp/robots.txt より株探の各銘柄の業績ページはスクレイピング禁止されていない（許可されているわけではない）が。やりすぎると逮捕されかねないので注意
+    ※有報キャッチャー(https://ufocatch.com/Dcompany.aspx?ec=E22016&m=y)の方が情報リッチだがseleniumで取る必要がありそうなのでやめた
     """
     try:
         dfs = pd.read_html(f'https://kabutan.jp/stock/finance?code={code}')

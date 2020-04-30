@@ -133,6 +133,7 @@ if __name__ == '__main__':
                 sales INTEGER, -- 売上高（単位:百万円）
                 op_income INTEGER, -- 営業利益（単位:百万円）
                 ord_income INTEGER, -- 経常利益（単位:百万円）
-                net_income INTEGER -- 最終利益（単位:百万円）
+                net_income INTEGER, -- 最終利益（単位:百万円）
+                PRIMARY KEY(code, term)
              );"""
     _create_table(sql, db_file_name)

@@ -1,31 +1,16 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-毎月入金しながら目標株価をみて株を売買する戦略をsimulator.pyでテストする
-https://raw.githubusercontent.com/BOSUKE/stock_and_python_book/master/chapter3/rating_trade.py
-
-＜シミュレーションの条件＞
-・ある日にn万円以上の所持金を持っていたら、新規に購入する株を物色する。
-・購入する株は、物色日の1か月前から物色日までに公開された各証券会社の目標株価の平均値が物色日の終値と比べ20%より高い銘柄のうち、
-　その割合が最も高いひとつの銘柄とする。
-    ─1か月の間に、ある証券会社がある銘柄について目標株価を複数回発表している場合、最後に発表された目標株価を利用する。
-    ─すでに保有している銘柄も購入対象とする。
-・選んだ銘柄を、物色日の翌日に所持金で買えるだけ初値で買う。
-　ただし、購入株数は単元株の倍数とし、また所持金が不足しており1単元も選んだ株を買えない時は購入しない。
-・購入した銘柄の終値が平均取得価額の±20%になった場合、その株を翌日の初値ですべて売る。
-・シミュレーション期間は、2008年4月1日から2018年4月1日の10年間。
-・シミュレーション開始時の所持金は100万円。ただし毎月の月初めにn万円所持金を増やす。
-
 Usage:
     $ activate stock
-    $ python rating_trade_plus_alpha.py
-    $ python rating_trade_plus_alpha.py -sd 20170101
+    $ python original_trade.py
 """
 import argparse
 import datetime
 import sqlite3
 import pandas as pd
 from dateutil.relativedelta import relativedelta
+from tqdm import tqdm
 
 import sys
 import pathlib
@@ -34,28 +19,23 @@ sys.path.append(str(current_dir))
 import simulator as sim
 
 
-def pattern2(row):
+def buy_pattern2(row):
     """
-    追加の株価購入条件:
-    - 終値が5MA,25MAより上
-    - 終値が前日からの直近10日間の最大高値より上
-    - 出来高が前日比30%以上増
-    - 終値が当日の値幅の上位70%以上(大陽線?)
+    買い条件:
+    - 当日終値が5MA,25MAより上
+    - 当日終値が前日からの直近10日間の最大高値より上
+    - 当日出来高が前日比30%以上増
+    - 当日終値が当日の値幅の上位70%以上(大陽線?)
     - 当日終値が25MA乖離率+5％未満
-    - 翌日始値-当日終値が0より大きい
     """
     if row['close'] >= row['5MA'] \
         and row['close'] >= row['25MA'] \
         and row['close'] >= row['high_shfi1_10MAX'] \
         and row['volume_1diff_rate'] >= 0.3 \
         and row['close'] >= ((row['high'] - row['low']) * 0.7) + row['low'] \
-        and (row['close'] - row['25MA']) / row['25MA'] < 0.05 \
-        and row['open_close_1diff'] > 0:
-        # print(row)
-        # return row
+        and (row['close'] - row['25MA']) / row['25MA'] < 0.05:
         return 1
     else:
-        # return pd.Series()
         return None
 
 
@@ -74,27 +54,32 @@ def is_judge_stock_code(db_file_name, code, start_date, end_date):
     # ### plu_alpha #### #
     prices['5MA'] = prices['close'].rolling(window=5).mean()
     prices['25MA'] = prices['close'].rolling(window=25).mean()
+    prices['75MA'] = prices['close'].rolling(window=75).mean()
+    prices['200MA'] = prices['close'].rolling(window=200).mean()
     prices['close_10MAX'] = prices['close'].rolling(window=10, min_periods=0).max()  # 直近10日間の中で最大終値
     prices['high_10MAX'] = prices['high'].rolling(window=10, min_periods=0).max()  # 直近10日間の中で最大高値
     prices['high_shfi1_10MAX'] = prices['high'].shift(1).fillna(0).rolling(window=10, min_periods=0).max()  # 前日からの直近10日間の中で最大高値
-    prices['volume_1diff_rate'] = (prices['volume'] - prices['volume'].shift(1).fillna(0)) / prices['volume'].shift(1).fillna(0)  # 前日比出来高
-    prices['open_close_1diff'] = prices['open'].shift(-1).fillna(0) - prices['close']  # 翌日始値-当日終値
+    prices['high_shfi1_15MAX'] = prices['high'].shift(1).fillna(0).rolling(window=15, min_periods=0).max()  # 前日からの直近15日間の中で最大高値
+    prices['volume_1diff_rate'] = (prices['volume'] - prices['volume'].shift(1).fillna(0)) / prices['volume']  # 前日比出来高
     # 購入フラグ付ける
-    prices['buy_flag'] = prices.apply(pattern2, axis=1)
+    prices['buy_flag'] = prices.apply(buy_pattern2, axis=1)
     ######################
     prices = prices.dropna(how='any')
 
     # 条件に当てはまるレコード無ければ、行もしくは列がない
     if prices.shape[0] == 0 or prices.shape[1] == 0:
         return False
+    # print(prices.head())
     buy_flag_date = [x.strftime("%Y-%m-%d") for x in prices.index.tolist()][-1]
-    # print(code, buy_flag_date)
-    if end_date == buy_flag_date:
+    # print(code, end_date, buy_flag_date, type(end_date), type(buy_flag_date))
+    # print(end_date == buy_flag_date)
+    if end_date == datetime.datetime.strptime(buy_flag_date, '%Y-%m-%d').date():
         return True
 
 
 def simulate_rating_trade(db_file_name, start_date, end_date, deposit, reserve,
-                          rating_rate=1.2, sell_buy_rate=0.2):
+                          months=1,
+                          rating_rate=1.1, sell_buy_rate=0.2, minimum_buy_threshold=300000):
     conn = sqlite3.connect(db_file_name)
 
     def get_open_price_func(date, code):
@@ -115,71 +100,26 @@ def simulate_rating_trade(db_file_name, start_date, end_date, deposit, reserve,
                          (code, date)).fetchone()
         return r[0]
 
-    def get_prospective_brand(date):
-        """購入する銘柄を物色  購入すべき銘柄の(コード, 単元株数, 比率)を返す
-        →「物色日の1か月前から物色日までに公開された各証券会社の
-        　目標株価の平均値が物色日の終値と比べ20%より高い銘柄のうち、
-        　その割合が最も高いひとつの銘柄
-        　（ただし、1か月の間にある証券会社がある銘柄について目標株価を複数回発表している場合、
-        　最後に発表された目標株価を利用する）」
-        を見つけ出して、その銘柄の銘柄コードと単元株数を返す
-        """
-        prev_month_day = date - relativedelta(months=1)
-        # <SQL解説>
-        # WITH句の last_date_t で銘柄コードと証券会社ごとに、1か月前から物色日までの間で最後に目標株価を公開した日を求める
-        # ↓
-        # WITH句の avg_t で銘柄ごとに、それぞれの証券会社が1か月前から物色日までの間で最後に公表した目標株価の平均値を求める
-        # ↓
-        # 残りの SELECT で銘柄ごとに物色日の終値に対する求めた平均値の割合が20%より高い銘柄のうち、
-        # 最も割合が高い1銘柄の銘柄コードと単元株数（と割合）を求める。
+    def get_brand_volume_df(date):
+        # codes = '2914, 7013'
+        codes = '7013, 8304, 3407, 2502, 2802, 4503, 6857, 6113, 6770, 8267, 7202, 5019, 8001, 4208, 4523, 5201, 9202, 6472, 9613, 9437, 6361, 8725, 2413, 6103, 9532, 3861, 4578, 1802, 6703, 9007, 6645, 7733, 4452, 6952, 1812, 9107, 7012, 9503, 2801, 7751, 6971, 4151, 2503, 6326, 3405, 8253, 9008, 9009, 9433, 5406, 1605, 9766, 4902, 6301, 1721, 7186, 4751, 2501, 3436, 6674, 5411, 5020, 6473, 3086, 4507, 8355, 4911, 7762, 1803, 9104, 4004, 4063, 8303, 5401, 9412, 7735, 7269, 7270, 5232, 4005, 5713, 6302, 8053, 5802, 8830, 6724, 1928, 9735, 4689, 3382, 2768, 6758, 8729, 9984, 8630, 4568, 8750, 6367, 1801, 7912, 4506, 5541, 5233, 6976, 1925, 8601, 8233, 2531, 4502, 8331, 4519, 9502, 8795, 2432, 3401, 6762, 4631, 4543, 4061, 6902, 4324, 5301, 9022, 3289, 8035, 8766, 9531, 9005, 8804, 9501, 4042, 5332, 9001, 9602, 5707, 5901, 3101, 3402, 5714, 4043, 7911, 7203, 8015, 4704, 7731, 9021, 2871, 1963, 4021, 7201, 2002, 3105, 6988, 5202, 5333, 4272, 5703, 1332, 6471, 3863, 5631, 4041, 2914, 9062, 6701, 5214, 9432, 2282, 6178, 9101, 8604, 1808, 6752, 7832, 9020, 6305, 6501, 7004, 7205, 9983, 6954, 8028, 8354, 5803, 6702, 6504, 4901, 5108, 5801, 7267, 8628, 7261, 8252, 1333, 8002, 8411, 7003, 4183, 5706, 8309, 8316, 8031, 8801, 3099, 4188, 7211, 7011, 8058, 9301, 8802, 6503, 5711, 8306, 6479, 2269, 6506, 9064, 7951, 7272, 3103, 6841, 5101, 6098, 7752, 8308'
         sql = f"""
-        WITH last_date_t AS (
-            SELECT
-                MAX(date) AS max_date,
-                code,
-                think_tank
-            FROM
-                ratings
-            WHERE
-                date BETWEEN :prev_month_day AND :day
-            GROUP BY
-                code,
-                think_tank
-        ),  avg_t AS (
-            SELECT
-                ratings.code,
-                AVG(ratings.target) AS target_avg
-            FROM
-                ratings,
-                last_date_t
-            WHERE
-                ratings.date = last_date_t.max_date
-                AND ratings.code = last_date_t.code
-                AND ratings.think_tank = last_date_t.think_tank
-            GROUP BY
-                ratings.code
-        )
         SELECT
-            avg_t.code,
-            brands.unit,
-            (avg_t.target_avg / raw_prices.close) AS rate
+            B.code,
+            B.unit,
+            P.volume
         FROM
-            avg_t,
-            raw_prices,
-            brands
+            prices AS P,
+            brands AS B
         WHERE
-            avg_t.code = raw_prices.code
-            AND raw_prices.date = :day
-            AND rate > {rating_rate}
-            AND raw_prices.code = brands.code
+            P.date = :date
+            AND P.code = B.code
+            AND P.code IN ({codes})
         ORDER BY
-            rate DESC
-        LIMIT
-            1
+            volume DESC
         """
-        return conn.execute(sql,
-                            {'day': date,
-                             'prev_month_day': prev_month_day}).fetchone()
+        return pd.read_sql(sql, conn,
+                           params={'date': date})
 
     current_month = start_date.month - 1
 
@@ -202,16 +142,24 @@ def simulate_rating_trade(db_file_name, start_date, end_date, deposit, reserve,
                 order_list.append(
                     sim.SellMarketOrder(code, stock.current_count))
 
-        # 月の入金額以上持っていたら新しい株を物色
-        if portfolio.deposit >= reserve:
-            r = get_prospective_brand(date)
-            if r:
-                code, unit, _ = r
-                order_list.append(sim.BuyMarketOrderAsPossible(code, unit))
+        # 購入最低金額以上持っていたら新しい株を物色
+        if portfolio.deposit >= minimum_buy_threshold:
+            # 当日の出来高が高い銘柄順に並び替えたデータフレーム
+            df = get_brand_volume_df(date)
+            #pbar = tqdm(df.head(50).itertuples(index=False))
+            #for row in pbar:
+            #    pbar.set_description(str(date))
+            for row in df.head(50).itertuples(index=False):
 
-            # 追加の株価購入条件もつける
-            if is_judge_stock_code(db_file_name, code, start_date, date):
-                order_list.append(sim.BuyMarketOrderAsPossible(code, unit))
+                # 追加の株価購入条件もつける
+                if is_judge_stock_code(db_file_name, row.code, start_date, date):
+                    # order_list.append(sim.BuyMarketOrderAsPossible(code, unit))
+
+                    # print(row.code, date)
+                    # 購入最低金額以上持っていたら新しい株購入
+                    order_list.append(sim.BuyMarketOrderMoreThan(row.code,
+                                                                 row.unit,
+                                                                 minimum_buy_threshold))
 
         return order_list
 
@@ -226,16 +174,20 @@ def get_args():
                     help="sqlite db file path.")
     ap.add_argument("-sd", "--start_date", type=str, default='20100401',
                     help="start day (yyyymmdd).")
-    ap.add_argument("-ed", "--end_date", type=str, default='20200401',
+    ap.add_argument("-ed", "--end_date", type=str, default=None,
                     help="end day (yyyymmdd).")
     ap.add_argument("-dep", "--deposit", type=int, default=1000000,
                     help="deposit money.")
-    ap.add_argument("-res", "--reserve", type=int, default=50000,
+    ap.add_argument("-res", "--reserve", type=int, default=0,
                     help="reserve month money.")
-    ap.add_argument("-r_rate", "--rating_rate", type=float, default=1.2,
+    ap.add_argument("-r_rate", "--rating_rate", type=float, default=1.1,
                     help="target rating rate.")
     ap.add_argument("-sb_rate", "--sell_buy_rate", type=float, default=0.2,
                     help="sell buy price rate.")
+    ap.add_argument("-m", "--months", type=int, default=3,
+                    help="rating months. default=3")
+    ap.add_argument("-mbt", "--minimum_buy_threshold", type=int, default=100000,
+                    help="minimum_buy_threshold.")
     return vars(ap.parse_args())
 
 
@@ -249,9 +201,12 @@ if __name__ == '__main__':
     start_date = datetime.date(int(args['start_date'][:4]),
                                int(args['start_date'][4:6]),
                                int(args['start_date'][6:]))
-    end_date = datetime.date(int(args['end_date'][:4]),
-                             int(args['end_date'][4:6]),
-                             int(args['end_date'][6:]))
+    if args['end_date'] is None:
+        end_date = datetime.date.today()
+    else:
+        end_date = datetime.date(int(args['end_date'][:4]),
+                                 int(args['end_date'][4:6]),
+                                 int(args['end_date'][6:]))
 
     # 開始時の所持金
     deposit = args['deposit']
@@ -265,12 +220,20 @@ if __name__ == '__main__':
     # 購入時の株価 * (1+sell_buy_rate) 以上（利確）もしくは購入時の株価 * (1-sell_buy_rate) 以下（損切り）
     sell_buy_rate = args['sell_buy_rate']
 
+    # 購入時の最低価格。デフォルトは30万円。30万以上持ち金あれば、30万円ぐらいの量株買う
+    minimum_buy_threshold = args['minimum_buy_threshold']
+
+    # レーティング情報サーチする期間
+    months = args['months']
+
     # 毎月入金しながら目標株価をみて株を売買するシミュレーション実行
     portfolio, result = simulate_rating_trade(db_file_name,
                                               start_date, end_date,
                                               deposit, reserve,
+                                              months=months,
                                               rating_rate=rating_rate,
-                                              sell_buy_rate=sell_buy_rate)
+                                              sell_buy_rate=sell_buy_rate,
+                                              minimum_buy_threshold=minimum_buy_threshold)
     print()
     print('現在の預り金:', portfolio.deposit)
     print('投資総額:', portfolio.amount_of_investment)
