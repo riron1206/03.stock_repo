@@ -69,17 +69,16 @@ def is_judge_stock_code(db_file_name, code, start_date, end_date):
     # 条件に当てはまるレコード無ければ、行もしくは列がない
     if prices.shape[0] == 0 or prices.shape[1] == 0:
         return False
-    # print(prices.head())
+
     buy_flag_date = [x.strftime("%Y-%m-%d") for x in prices.index.tolist()][-1]
-    # print(code, end_date, buy_flag_date, type(end_date), type(buy_flag_date))
-    # print(end_date == buy_flag_date)
     if end_date == datetime.datetime.strptime(buy_flag_date, '%Y-%m-%d').date():
         return True
 
 
 def simulate_rating_trade(db_file_name, start_date, end_date, deposit, reserve,
                           months=1,
-                          rating_rate=1.1, sell_buy_rate=0.2, minimum_buy_threshold=300000):
+                          rating_rate=1.1, sell_buy_rate=0.2, minimum_buy_threshold=300000,
+                          codes=None):
     conn = sqlite3.connect(db_file_name)
 
     def get_open_price_func(date, code):
@@ -100,9 +99,18 @@ def simulate_rating_trade(db_file_name, start_date, end_date, deposit, reserve,
                          (code, date)).fetchone()
         return r[0]
 
+    def get_price_func(date, code):
+        """DBから指定の銘柄の指定の日のを取得する
+        """
+        r = conn.execute('SELECT close FROM prices '
+                         'WHERE code = ? AND date <= ? '
+                         'ORDER BY date DESC LIMIT 1',
+                         (code, date)).fetchone()
+        return r[0]
+
     def get_brand_volume_df(date):
         # codes = '2914, 7013'
-        codes = '7013, 8304, 3407, 2502, 2802, 4503, 6857, 6113, 6770, 8267, 7202, 5019, 8001, 4208, 4523, 5201, 9202, 6472, 9613, 9437, 6361, 8725, 2413, 6103, 9532, 3861, 4578, 1802, 6703, 9007, 6645, 7733, 4452, 6952, 1812, 9107, 7012, 9503, 2801, 7751, 6971, 4151, 2503, 6326, 3405, 8253, 9008, 9009, 9433, 5406, 1605, 9766, 4902, 6301, 1721, 7186, 4751, 2501, 3436, 6674, 5411, 5020, 6473, 3086, 4507, 8355, 4911, 7762, 1803, 9104, 4004, 4063, 8303, 5401, 9412, 7735, 7269, 7270, 5232, 4005, 5713, 6302, 8053, 5802, 8830, 6724, 1928, 9735, 4689, 3382, 2768, 6758, 8729, 9984, 8630, 4568, 8750, 6367, 1801, 7912, 4506, 5541, 5233, 6976, 1925, 8601, 8233, 2531, 4502, 8331, 4519, 9502, 8795, 2432, 3401, 6762, 4631, 4543, 4061, 6902, 4324, 5301, 9022, 3289, 8035, 8766, 9531, 9005, 8804, 9501, 4042, 5332, 9001, 9602, 5707, 5901, 3101, 3402, 5714, 4043, 7911, 7203, 8015, 4704, 7731, 9021, 2871, 1963, 4021, 7201, 2002, 3105, 6988, 5202, 5333, 4272, 5703, 1332, 6471, 3863, 5631, 4041, 2914, 9062, 6701, 5214, 9432, 2282, 6178, 9101, 8604, 1808, 6752, 7832, 9020, 6305, 6501, 7004, 7205, 9983, 6954, 8028, 8354, 5803, 6702, 6504, 4901, 5108, 5801, 7267, 8628, 7261, 8252, 1333, 8002, 8411, 7003, 4183, 5706, 8309, 8316, 8031, 8801, 3099, 4188, 7211, 7011, 8058, 9301, 8802, 6503, 5711, 8306, 6479, 2269, 6506, 9064, 7951, 7272, 3103, 6841, 5101, 6098, 7752, 8308'
+        # codes = '7013, 8304, 3407, 2502, 2802, 4503, 6857, 6113, 6770, 8267, 7202, 5019, 8001, 4208, 4523, 5201, 9202, 6472, 9613, 9437, 6361, 8725, 2413, 6103, 9532, 3861, 4578, 1802, 6703, 9007, 6645, 7733, 4452, 6952, 1812, 9107, 7012, 9503, 2801, 7751, 6971, 4151, 2503, 6326, 3405, 8253, 9008, 9009, 9433, 5406, 1605, 9766, 4902, 6301, 1721, 7186, 4751, 2501, 3436, 6674, 5411, 5020, 6473, 3086, 4507, 8355, 4911, 7762, 1803, 9104, 4004, 4063, 8303, 5401, 9412, 7735, 7269, 7270, 5232, 4005, 5713, 6302, 8053, 5802, 8830, 6724, 1928, 9735, 4689, 3382, 2768, 6758, 8729, 9984, 8630, 4568, 8750, 6367, 1801, 7912, 4506, 5541, 5233, 6976, 1925, 8601, 8233, 2531, 4502, 8331, 4519, 9502, 8795, 2432, 3401, 6762, 4631, 4543, 4061, 6902, 4324, 5301, 9022, 3289, 8035, 8766, 9531, 9005, 8804, 9501, 4042, 5332, 9001, 9602, 5707, 5901, 3101, 3402, 5714, 4043, 7911, 7203, 8015, 4704, 7731, 9021, 2871, 1963, 4021, 7201, 2002, 3105, 6988, 5202, 5333, 4272, 5703, 1332, 6471, 3863, 5631, 4041, 2914, 9062, 6701, 5214, 9432, 2282, 6178, 9101, 8604, 1808, 6752, 7832, 9020, 6305, 6501, 7004, 7205, 9983, 6954, 8028, 8354, 5803, 6702, 6504, 4901, 5108, 5801, 7267, 8628, 7261, 8252, 1333, 8002, 8411, 7003, 4183, 5706, 8309, 8316, 8031, 8801, 3099, 4188, 7211, 7011, 8058, 9301, 8802, 6503, 5711, 8306, 6479, 2269, 6506, 9064, 7951, 7272, 3103, 6841, 5101, 6098, 7752, 8308'
         sql = f"""
         SELECT
             B.code,
@@ -114,7 +122,7 @@ def simulate_rating_trade(db_file_name, start_date, end_date, deposit, reserve,
         WHERE
             P.date = :date
             AND P.code = B.code
-            AND P.code IN ({codes})
+            AND P.code IN ({', '.join('{}'.format(i) for i in codes)})
         ORDER BY
             volume DESC
         """
@@ -136,7 +144,10 @@ def simulate_rating_trade(db_file_name, start_date, end_date, deposit, reserve,
 
         # ±20パーセントで利確/損切り
         for code, stock in portfolio.stocks.items():
+            #print('code, stock', code, stock)
+
             current = get_close_price_func(date, code)
+
             rate = (current / stock.average_cost) - 1
             if abs(rate) > sell_buy_rate:
                 order_list.append(
@@ -146,16 +157,13 @@ def simulate_rating_trade(db_file_name, start_date, end_date, deposit, reserve,
         if portfolio.deposit >= minimum_buy_threshold:
             # 当日の出来高が高い銘柄順に並び替えたデータフレーム
             df = get_brand_volume_df(date)
-            #pbar = tqdm(df.head(50).itertuples(index=False))
-            #for row in pbar:
-            #    pbar.set_description(str(date))
-            for row in df.head(50).itertuples(index=False):
+            pbar = tqdm(df.head(50).itertuples(index=False), leave=False)
+            for row in pbar:
+                pbar.set_description(str(date))
+            # for row in df.head(50).itertuples(index=False):
 
                 # 追加の株価購入条件もつける
                 if is_judge_stock_code(db_file_name, row.code, start_date, date):
-                    # order_list.append(sim.BuyMarketOrderAsPossible(code, unit))
-
-                    # print(row.code, date)
                     # 購入最低金額以上持っていたら新しい株購入
                     order_list.append(sim.BuyMarketOrderMoreThan(row.code,
                                                                  row.unit,
@@ -188,6 +196,7 @@ def get_args():
                     help="rating months. default=3")
     ap.add_argument("-mbt", "--minimum_buy_threshold", type=int, default=100000,
                     help="minimum_buy_threshold.")
+    ap.add_argument("-cs", "--codes", type=int, nargs='*', default=[7267, 2914])
     return vars(ap.parse_args())
 
 
@@ -233,7 +242,8 @@ if __name__ == '__main__':
                                               months=months,
                                               rating_rate=rating_rate,
                                               sell_buy_rate=sell_buy_rate,
-                                              minimum_buy_threshold=minimum_buy_threshold)
+                                              minimum_buy_threshold=minimum_buy_threshold,
+                                              codes=args['codes'])
     print()
     print('現在の預り金:', portfolio.deposit)
     print('投資総額:', portfolio.amount_of_investment)

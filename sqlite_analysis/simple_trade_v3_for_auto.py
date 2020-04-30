@@ -10,13 +10,245 @@ Usage:
     $ python ./simple_trade_v2_for_auto.py -cs 7013 8304 3407 2502 2802 4503 6857 6113 6770 8267 7202 5019 8001 4208 4523 5201 9202 6472 9613 9437 6361 8725 2413 6103 9532 3861 4578 1802 6703 9007 6645 7733 4452 6952 1812 9107 7012 9503 2801 7751 6971 4151 2503 6326 3405 8253 9008 9009 9433 5406 1605 9766 4902 6301 1721 7186 4751 2501 3436 6674 5411 5020 6473 3086 4507 8355 4911 7762 1803 9104 4004 4063 8303 5401 9412 7735 7269 7270 5232 4005 5713 6302 8053 5802 8830 6724 1928 9735 4689 3382 2768 6758 8729 9984 8630 4568 8750 6367 1801 7912 4506 5541 5233 6976 1925 8601 8233 2531 4502 8331 4519 9502 8795 2432 3401 6762 4631 4543 4061 6902 4324 5301 9022 3289 8035 8766 9531 9005 8804 9501 4042 5332 9001 9602 5707 5901 3101 3402 5714 4043 7911 7203 8015 4704 7731 9021 2871 1963 4021 7201 2002 3105 6988 5202 5333 4272 5703 1332 6471 3863 5631 4041 2914 9062 6701 5214 9432 2282 6178 9101 8604 1808 6752 7832 9020 6305 6501 7004 7205 9983 6954 8028 8354 5803 6702 6504 4901 5108 5801 7267 8628 7261 8252 1333 8002 8411 7003 4183 5706 8309 8316 8031 8801 3099 4188 7211 7011 8058 9301 8802 6503 5711 8306 6479 2269 6506 9064 7951 7272 3103 6841 5101 6098 7752 8308
 """
 import argparse
+import collections
 import datetime
+import math
 import os
 import sqlite3
+import sys
 import pandas as pd
 from tqdm import tqdm
-import warnings
-warnings.filterwarnings("ignore")
+
+
+def calc_tax(total_profit):
+    """儲けに対する税金計算
+    """
+    if total_profit < 0:
+        return 0
+    return int(total_profit * 0.20315)
+
+
+def calc_fee(total):
+    """約定手数料計算(楽天証券の場合）
+    """
+    if total <= 50000:
+        return 54
+    elif total <= 100000:
+        return 97
+    elif total <= 200000:
+        return 113
+    elif total <= 500000:
+        return 270
+    elif total <= 1000000:
+        return 525
+    elif total <= 1500000:
+        return 628
+    elif total <= 30000000:
+        return 994
+    else:
+        return 1050
+
+
+def calc_cost_of_buying(count, price):
+    """株を買うのに必要なコストと手数料を計算
+    """
+    subtotal = int(count * price)
+    fee = calc_fee(subtotal)
+    return subtotal + fee, fee
+
+
+def calc_cost_of_selling(count, price):
+    """株を売るのに必要なコストと手数料を計算
+    """
+    subtotal = int(count * price)
+    fee = calc_fee(subtotal)
+    return fee, fee
+
+
+def calc_max_drawdown(prices):
+    """最大ドローダウンを計算して返す
+        Usege:
+            # calc_max_drawdownの呼び出し
+            calc_max_drawdown(result.price)
+    """
+    cummax_ret = prices.cummax()  # cummax関数: DataFrameまたはSeries軸の累積最大値を求める。あるindexについて、そのindexとそれより前にある全要素の最大値を求めて、その結果をそのindexに格納したSeries（またはDataFrame）を返すメソッド
+    drawdown = cummax_ret - prices  # 日々の総資産額のその日までの最大値とその日の総資産額との差分
+    max_drawdown_date = drawdown.idxmax()  # drawdownの中で最大の値をもつ要素のindexをidxmaxメソッドで求め、そのindexを使って最大ドローダウンの値を求めている
+    return drawdown[max_drawdown_date] / cummax_ret[max_drawdown_date]
+
+
+def calc_sharp_ratio(returns):
+    """シャープレシオを計算して返す
+    """
+    # .meanは平均値(=期待値)を求めるメソッド
+    return returns.mean() / returns.std()
+
+
+def calc_information_ratio(returns, benchmark_retruns):
+    """インフォメーションレシオを計算して返す
+    """
+    excess_returns = returns - benchmark_retruns
+    return excess_returns.mean() / excess_returns.std()
+
+
+def calc_sortino_ratio(returns):
+    """ソルティノレシオを計算して返す
+    """
+    tdd = math.sqrt(returns.clip_upper(0).pow(2).sum() / returns.size)
+    return returns.mean() / tdd
+
+
+def calc_calmar_ratio(prices, returns):
+    """カルマ―レシオを計算して返す
+    """
+    return returns.mean() / calc_max_drawdown(prices)
+
+
+class OwnedStock(object):
+    def __init__(self):
+        self.total_cost = 0     # 取得にかかったコスト（総額)
+        self.total_count = 0    # 取得した株数(総数)
+        self.current_count = 0  # 現在保有している株数
+        self.average_cost = 0   # 平均取得価額
+
+    def append(self, count, cost):
+        """保有する株数が増えるたびに平均取得価額を計算する
+        複数回にわけて株を購入した場合、売却時点で取得にかかったコストを見積もるため平均取得価額計算する
+        """
+        if self.total_count != self.current_count:
+            self.total_count = self.current_count
+            self.total_cost = self.current_count * self.average_cost
+        self.total_cost += cost
+        self.total_count += count
+        self.current_count += count
+        self.average_cost = math.ceil(self.total_cost / self.total_count)
+
+    def remove(self, count):
+        if self.current_count < count:
+            raise ValueError("can't remove", self.total_cost, count)
+        self.current_count -= count
+
+
+class Portfolio(object):
+    """資産管理を行うクラス
+    今、どの株をどれだけ持っているか、その評価額、株の売買にかかるコスト（手数料・税金）などを保持する
+    """
+    def __init__(self, deposit):
+        self.deposit = deposit  # 現在の預り金
+        self.amount_of_investment = deposit  # 投資総額
+        self.total_profit = 0  # 総利益（税引き前）
+        self.total_tax = 0  # （源泉徴収)税金合計
+        self.total_fee = 0  # 手数料合計
+        self.count_of_trades = 0  # トレード総数
+        self.count_of_wins = 0   # 勝ちトレード数
+        self.total_gains = 0     # 総利益(損失分の相殺無しの値)
+        self.total_losses = 0    # 総損出
+
+        self.stocks = collections.defaultdict(OwnedStock)  # 保有銘柄 銘柄コード　-> OwnedStock への辞書
+
+    def add_deposit(self, deposit):
+        """預り金を増やす (= 証券会社に入金)
+        """
+        self.deposit += deposit
+        self.amount_of_investment += deposit
+
+    def buy_stock(self, code, count, price):
+        """株を買う
+        """
+        cost, fee = calc_cost_of_buying(count, price)
+        if cost > self.deposit:
+            raise ValueError('cost > deposit', cost, self.deposit)
+
+        # 保有株数増加
+        self.stocks[code].append(count, cost)
+
+        self.deposit -= cost
+        self.total_fee += fee
+
+    def sell_stock(self, code, count, price):
+        """株を売る
+        """
+        subtotal = int(count * price)
+        cost, fee = calc_cost_of_selling(count, price)
+        if cost > self.deposit + subtotal:
+            raise ValueError('cost > deposit + subtotal',
+                             cost, self.deposit + subtotal)
+
+        # 保有株数減算
+        stock = self.stocks[code]
+        average_cost = stock.average_cost
+        stock.remove(count)
+        if stock.current_count == 0:
+            del self.stocks[code]
+
+        # 儲け計算
+        profit = int((price - average_cost) * count - cost)
+        self.total_profit += profit
+
+        # トレード結果保存
+        self.count_of_trades += 1
+        if profit >= 0:
+            self.count_of_wins += 1
+            self.total_gains += profit
+        else:
+            self.total_losses += -profit
+
+        # 源泉徴収額決定
+        current_tax = calc_tax(self.total_profit)
+        withholding = current_tax - self.total_tax
+        self.total_tax = current_tax
+
+        self.deposit += subtotal - cost - withholding
+        self.total_fee += fee
+
+    def calc_current_total_price(self, get_current_price_func):
+        """現在の評価額を返す
+        """
+        stock_price = sum(get_current_price_func(code)
+                          * stock.current_count
+                          for code, stock in self.stocks.items())
+        return stock_price + self.deposit
+
+    def calc_winning_percentage(self):
+        """勝率を返す"""
+        return (self.count_of_wins / self.count_of_trades) * 100
+
+    def calc_payoff_ratio(self):
+        """ペイオフレシオを返す
+        """
+        loss = self.count_of_trades - self.count_of_wins
+        if self.count_of_wins and loss:
+            ave_gain = self.total_gains / self.count_of_wins
+            ave_losses = self.total_losses / loss
+            return ave_gain / ave_losses
+        else:
+            return sys.float_info.max
+
+    def calc_profit_factor(self):
+        """プロフィットファクターを返す
+        """
+        if self.total_losses:
+            return self.total_gains / self.total_losses
+        else:
+            return sys.float_info.max
+
+
+def check_real_profit(deposit=1000000):
+    # portfolio = Portfolio(deposit)
+
+    df = pd.read_csv(r'C:\Users\shingo\jupyter_notebook\stock_work\03.stock_repo\sqlite_analysis\output\simple_trade_v2.csv',
+                     encoding='shift-jis')
+    df = df.rename(columns={'損益': 'profit', '注文数': 'count'})
+
+    df[df['profit'] > df
+
+    for row in df.itertuples(index=False):
+
+    #    stock.append(row.count, )
+
+
+if __name__ == '__main__':
+    check_real_profit()
 
 
 def table_to_df(table_name=None, sql=None, db_file_name=r'D:\DB_Browser_for_SQLite\stock.db'):
@@ -191,10 +423,7 @@ def sell_pattern1(df, df_buy):
                               'set_profits': set_profits,
                               '注文数': df_buy['注文数']})  #.dropna(how='any')
 
-    df_profit['1株あたりの損益'] = df_profit['sell_values'] - df_profit['buy_values']
-    df_profit['購入額'] = df_profit['buy_values'] * df_profit['注文数']
-    df_profit['売却額'] = df_profit['sell_values'] * df_profit['注文数']
-    df_profit['利益'] = df_profit['売却額'] - df_profit['購入額']
+    df_profit['損益'] = df_profit['sell_values'] - df_profit['buy_values']
     return df_profit
 
 
@@ -215,6 +444,8 @@ def set_buy_df_for_auto(df_buy, kubun='現物'):
     df_buy['注文日'] = ''
     df_buy['約定日'] = ''
     df_buy = df_buy.sort_values(by=['注文実行日'])
+    df_buy = df_buy[['注文実行日', '注文番号', '証券コード', '取引方法', '取引区分', '信用取引区分',
+                     '注文数', '注文条件１', '注文条件２', '指値', '利確', '損切', '注文日', '約定日']]
     return df_buy
 
 
@@ -278,36 +509,9 @@ def set_sell_df_for_auto(df_profit, kubun='現物'):
     df_profit['注文日'] = ''
     df_profit['約定日'] = ''
     df_profit = df_profit.sort_values(by=['注文実行日'])
+    df_profit = df_profit[['注文実行日', '注文番号', '証券コード', '取引方法', '取引区分', '信用取引区分',
+                           '注文数', '注文条件１', '注文条件２', '指値', '利確', '損切', '注文日', '約定日']]
     return df_profit
-
-
-def calc_stock_index(df, profit_col='_利益', deposit=1000000):
-    """ 株価指標計算する """
-    df_win = df[df[profit_col] > 0]
-    df_lose = df[df[profit_col] < 0]
-
-    winning_percentage = df_win.shape[0] / df.shape[0]
-    print('勝率:', round(winning_percentage, 2), '%')
-
-    payoff_ratio = abs(df_win[profit_col].mean() / df_lose[profit_col].mean())
-    print('ペイオフレシオ（勝ちトレードの平均利益額が負けトレードの平均損失額の何倍か）:', round(payoff_ratio, 2))
-
-    profit_factor = abs(df_win[profit_col].sum() / df_lose[profit_col].sum())
-    print('プロフィットファクター（総利益が総損失の何倍か）:', round(profit_factor, 2))
-
-    sharp_ratio = df[profit_col].mean() / df[profit_col].std()
-    print('シャープレシオ（利益のばらつき）:', round(sharp_ratio, 2))
-
-    def calc_max_drawdown(prices):
-        """最大ドローダウンを計算して返す"""
-        cummax_ret = prices.cummax()  # cummax関数: DataFrameまたはSeries軸の累積最大値を求める。あるindexについて、そのindexとそれより前にある全要素の最大値を求めて、その結果をそのindexに格納したSeries（またはDataFrame）を返すメソッド
-        drawdown = cummax_ret - prices  # 日々の総資産額のその日までの最大値とその日の総資産額との差分
-        max_drawdown_date = drawdown.idxmax()  # drawdownの中で最大の値をもつ要素のindexをidxmaxメソッドで求め、そのindexを使って最大ドローダウンの値を求めている
-        return drawdown[max_drawdown_date] / cummax_ret[max_drawdown_date] * 100
-    max_drawdown = calc_max_drawdown(df[profit_col] + deposit)
-    print(f'種銭={deposit//10000}万円としたときの最大ドローダウン（総資産額の最大下落率）:', round(max_drawdown, 2), '%')
-
-    return winning_percentage, payoff_ratio, profit_factor, sharp_ratio, max_drawdown
 
 
 def trade(code, start_date, buy_pattern, sell_pattern, minimum_buy_threshold, under_unit):
@@ -357,7 +561,7 @@ def trade(code, start_date, buy_pattern, sell_pattern, minimum_buy_threshold, un
             df_profit = sell_pattern1(df, df_buy)
 
         # print(df_profit)
-        print(f"code: {code} 利益: {round(df_profit['利益'].sum())}\n")
+        print(f"code: {code} 損益合計: {round(df_profit['損益'].sum())}\n")
 
         df_profit['code'] = code
         return df_profit, df_buy
@@ -375,11 +579,11 @@ def get_args():
     ap.add_argument("-sp", "--sell_pattern", type=int, default=1)
     ap.add_argument("-mbt", "--minimum_buy_threshold", type=int, default=300000)
     ap.add_argument("-uu", "--under_unit", type=int, default=100)
-    ap.add_argument("-dep", "--deposit", type=int, default=1000000, help="deposit money.")
     return vars(ap.parse_args())
 
 
-if __name__ == '__main__':
+#if __name__ == '__main__':
+def _tmp():
     args = get_args()
 
     # code = 7267  # リクルート
@@ -421,21 +625,12 @@ if __name__ == '__main__':
     os.makedirs(output_dir, exist_ok=True)
 
     # 損益確認用csv
-    df_profit_codes = df_profit_codes.sort_values(by=['buy_dates', 'sell_dates', 'code'])
-    df_profit_codes = df_profit_codes[['code', 'buy_dates', 'buy_values',
-                                       'sell_condition2s', 'sell_dates', 'sell_values',
-                                       '1株あたりの損益', '注文数', '購入額', '売却額', '利益']]
+    df_profit_codes = df_profit_codes[['code', 'buy_dates', 'buy_values', 'sell_condition2s', 'sell_dates', 'sell_values', '損益', '注文数']]
     df_profit_codes.to_csv(os.path.join(output_dir, 'simple_trade_v2.csv'), index=False, encoding='shift-jis')
-    print('総利益:', round(df_profit_codes['利益'].sum(), 2))
-
-    # 株価指標計算
-    print()
-    _ = calc_stock_index(df_profit_codes, profit_col='利益', deposit=args['deposit'])
+    print('損益合計:', df_profit_codes['損益'].sum())
 
     # 自動売買用csv
     df_for_autos = df_for_autos.dropna(subset=['注文実行日'])
     df_for_autos = df_for_autos.sort_values(by=['注文実行日'])
     df_for_autos['注文番号'] = range(1, df_for_autos.shape[0] + 1)
-    df_for_autos = df_for_autos[['注文実行日', '注文番号', '証券コード', '取引方法', '取引区分', '信用取引区分',
-                                 '注文数', '注文条件１', '注文条件２', '指値', '利確', '損切', '注文日', '約定日']]
     df_for_autos.to_csv(os.path.join(output_dir, 'auto_order.csv'), index=False, encoding='shift-jis')

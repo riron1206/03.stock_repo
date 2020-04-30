@@ -34,29 +34,28 @@ sys.path.append(str(current_dir))
 import simulator as sim
 
 
-def pattern2(row):
+def buy_pattern2(row):
     """
-    追加の株価購入条件:
-    - 終値が5MA,25MAより上
-    - 終値が前日からの直近10日間の最大高値より上
-    - 出来高が前日比30%以上増
-    - 終値が当日の値幅の上位70%以上(大陽線?)
+    買い条件:
+    - 当日終値が5MA,25MAより上
+    - 当日終値が前日からの直近10日間の最大高値より上
+    - 当日出来高が前日比30%以上増
+    - 当日終値が当日の値幅の上位70%以上(大陽線?)
     - 当日終値が25MA乖離率+5％未満
-    - 翌日始値-当日終値が0より大きい
+
     """
     if row['close'] >= row['5MA'] \
         and row['close'] >= row['25MA'] \
         and row['close'] >= row['high_shfi1_10MAX'] \
         and row['volume_1diff_rate'] >= 0.3 \
         and row['close'] >= ((row['high'] - row['low']) * 0.7) + row['low'] \
-        and (row['close'] - row['25MA']) / row['25MA'] < 0.05 \
-        and row['open_close_1diff'] > 0:
-        # print(row)
+        and (row['close'] - row['25MA']) / row['25MA'] < 0.05:
+        # - 当日高値＋１で逆指値
         # return row
         return 1
     else:
         # return pd.Series()
-        return None
+        return 0
 
 
 def is_judge_stock_code(db_file_name, code, start_date, end_date):
@@ -74,13 +73,15 @@ def is_judge_stock_code(db_file_name, code, start_date, end_date):
     # ### plu_alpha #### #
     prices['5MA'] = prices['close'].rolling(window=5).mean()
     prices['25MA'] = prices['close'].rolling(window=25).mean()
+    prices['75MA'] = prices['close'].rolling(window=75).mean()
+    prices['200MA'] = prices['close'].rolling(window=200).mean()
     prices['close_10MAX'] = prices['close'].rolling(window=10, min_periods=0).max()  # 直近10日間の中で最大終値
     prices['high_10MAX'] = prices['high'].rolling(window=10, min_periods=0).max()  # 直近10日間の中で最大高値
     prices['high_shfi1_10MAX'] = prices['high'].shift(1).fillna(0).rolling(window=10, min_periods=0).max()  # 前日からの直近10日間の中で最大高値
     prices['volume_1diff_rate'] = (prices['volume'] - prices['volume'].shift(1).fillna(0)) / prices['volume'].shift(1).fillna(0)  # 前日比出来高
     prices['open_close_1diff'] = prices['open'].shift(-1).fillna(0) - prices['close']  # 翌日始値-当日終値
     # 購入フラグ付ける
-    prices['buy_flag'] = prices.apply(pattern2, axis=1)
+    prices['buy_flag'] = prices.apply(buy_pattern2, axis=1)
     ######################
     prices = prices.dropna(how='any')
 
@@ -94,7 +95,8 @@ def is_judge_stock_code(db_file_name, code, start_date, end_date):
 
 
 def simulate_rating_trade(db_file_name, start_date, end_date, deposit, reserve,
-                          rating_rate=1.2, sell_buy_rate=0.2):
+                          months=1,
+                          rating_rate=1.2, sell_buy_rate=0.2, minimum_buy_threshold=300000):
     conn = sqlite3.connect(db_file_name)
 
     def get_open_price_func(date, code):
@@ -174,12 +176,10 @@ def simulate_rating_trade(db_file_name, start_date, end_date, deposit, reserve,
             AND raw_prices.code = brands.code
         ORDER BY
             rate DESC
-        LIMIT
-            1
         """
         return conn.execute(sql,
                             {'day': date,
-                             'prev_month_day': prev_month_day}).fetchone()
+                             'prev_month_day': prev_month_day}).fetchall()
 
     current_month = start_date.month - 1
 
@@ -204,14 +204,18 @@ def simulate_rating_trade(db_file_name, start_date, end_date, deposit, reserve,
 
         # 月の入金額以上持っていたら新しい株を物色
         if portfolio.deposit >= reserve:
-            r = get_prospective_brand(date)
-            if r:
-                code, unit, _ = r
-                order_list.append(sim.BuyMarketOrderAsPossible(code, unit))
+            # レーティング情報
+            for r in get_prospective_brand(date):
+                if r:
+                    code, unit, _ = r
+                    # order_list.append(sim.BuyMarketOrderAsPossible(code, unit))
 
-            # 追加の株価購入条件もつける
-            if is_judge_stock_code(db_file_name, code, start_date, date):
-                order_list.append(sim.BuyMarketOrderAsPossible(code, unit))
+                    # 追加の株価購入条件もつける
+                    if is_judge_stock_code(db_file_name, code, start_date, date):
+                        # 購入最低金額以上持っていたら新しい株購入
+                        order_list.append(sim.BuyMarketOrderMoreThan(code,
+                                                                     unit,
+                                                                     minimum_buy_threshold))
 
         return order_list
 
@@ -230,12 +234,16 @@ def get_args():
                     help="end day (yyyymmdd).")
     ap.add_argument("-dep", "--deposit", type=int, default=1000000,
                     help="deposit money.")
-    ap.add_argument("-res", "--reserve", type=int, default=50000,
+    ap.add_argument("-res", "--reserve", type=int, default=0,
                     help="reserve month money.")
     ap.add_argument("-r_rate", "--rating_rate", type=float, default=1.2,
                     help="target rating rate.")
     ap.add_argument("-sb_rate", "--sell_buy_rate", type=float, default=0.2,
                     help="sell buy price rate.")
+    ap.add_argument("-m", "--months", type=int, default=1,
+                    help="rating months. default=3")
+    ap.add_argument("-mbt", "--minimum_buy_threshold", type=int, default=300000,
+                    help="minimum_buy_threshold.")
     return vars(ap.parse_args())
 
 
@@ -269,8 +277,10 @@ if __name__ == '__main__':
     portfolio, result = simulate_rating_trade(db_file_name,
                                               start_date, end_date,
                                               deposit, reserve,
+                                              months=args['months'],
                                               rating_rate=rating_rate,
-                                              sell_buy_rate=sell_buy_rate)
+                                              sell_buy_rate=sell_buy_rate,
+                                              minimum_buy_threshold=args['minimum_buy_threshold'])
     print()
     print('現在の預り金:', portfolio.deposit)
     print('投資総額:', portfolio.amount_of_investment)
