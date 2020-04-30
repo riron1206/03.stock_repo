@@ -5,7 +5,9 @@
 自動売買で使うcsvも出す
 Usage:
     $ activate stock
+    $ python ./simple_trade_v2_for_auto.py -cs 4507 -sd 20141001 -ed 20151112
     $ python ./simple_trade_v2_for_auto.py -cs 7013 -bp 2
+    $ python ./simple_trade_v2_for_auto.py -cs 2914 -sd 20150101
     $ python ./simple_trade_v2_for_auto.py -cs 2914 7013 8304 -bp 2
     $ python ./simple_trade_v2_for_auto.py -cs 7013 8304 3407 2502 2802 4503 6857 6113 6770 8267 7202 5019 8001 4208 4523 5201 9202 6472 9613 9437 6361 8725 2413 6103 9532 3861 4578 1802 6703 9007 6645 7733 4452 6952 1812 9107 7012 9503 2801 7751 6971 4151 2503 6326 3405 8253 9008 9009 9433 5406 1605 9766 4902 6301 1721 7186 4751 2501 3436 6674 5411 5020 6473 3086 4507 8355 4911 7762 1803 9104 4004 4063 8303 5401 9412 7735 7269 7270 5232 4005 5713 6302 8053 5802 8830 6724 1928 9735 4689 3382 2768 6758 8729 9984 8630 4568 8750 6367 1801 7912 4506 5541 5233 6976 1925 8601 8233 2531 4502 8331 4519 9502 8795 2432 3401 6762 4631 4543 4061 6902 4324 5301 9022 3289 8035 8766 9531 9005 8804 9501 4042 5332 9001 9602 5707 5901 3101 3402 5714 4043 7911 7203 8015 4704 7731 9021 2871 1963 4021 7201 2002 3105 6988 5202 5333 4272 5703 1332 6471 3863 5631 4041 2914 9062 6701 5214 9432 2282 6178 9101 8604 1808 6752 7832 9020 6305 6501 7004 7205 9983 6954 8028 8354 5803 6702 6504 4901 5108 5801 7267 8628 7261 8252 1333 8002 8411 7003 4183 5706 8309 8316 8031 8801 3099 4188 7211 7011 8058 9301 8802 6503 5711 8306 6479 2269 6506 9064 7951 7272 3103 6841 5101 6098 7752 8308
 """
@@ -131,6 +133,7 @@ def sell_pattern1(df, df_buy):
             sell_value = None
             sell_condition2 = None
 
+            # シグナルの出た（前日or当日）安値の-5円で逆指値
             if series['low'] <= stop_loss:
                 sell_condition2 = '逆指値'  # 損切
                 sell_date = df.loc[sell_sig]['date']  # 即日損切
@@ -141,10 +144,14 @@ def sell_pattern1(df, df_buy):
                 sell_condition2s.append(sell_condition2)
                 break
 
+            # シグナル当日の25MAとの乖離(+5～+8%)を超えた
             if df.loc[signal_ind]['close'] < set_profit <= series['high']:
                 sell_condition2 = '指値'  # 利確
                 sell_date = df.loc[sell_sig]['date']  # 即日利確
-                sell_value = set_profit
+                if set_profit <= series['low']:
+                    sell_value = series['low']  # 8%を超えた値からスタートした場合は安値で売却したとする
+                else:
+                    sell_value = set_profit  # 8%を超えた値からスタートしない場合は8%で売却したとする
 
                 sell_dates.append(sell_date)
                 sell_values.append(sell_value)
@@ -175,6 +182,7 @@ def sell_pattern1(df, df_buy):
                 sell_condition2s.append(sell_condition2)
                 break
 
+        # print(sell_date, sell_value, sell_condition2)
         # 後処理
         if len(sell_dates) < len(buy_dates):
             for i in range(len(buy_dates) - len(sell_dates)):
@@ -310,7 +318,7 @@ def calc_stock_index(df, profit_col='_利益', deposit=1000000):
     return winning_percentage, payoff_ratio, profit_factor, sharp_ratio, max_drawdown
 
 
-def trade(code, start_date, buy_pattern, sell_pattern, minimum_buy_threshold, under_unit):
+def trade(code, start_date, end_date, buy_pattern, sell_pattern, minimum_buy_threshold, under_unit):
     # DBから株価取得
     sql = f"""
     SELECT
@@ -320,7 +328,7 @@ def trade(code, start_date, buy_pattern, sell_pattern, minimum_buy_threshold, un
     WHERE
         t.code = {code}
     AND
-        t.date > '{start_date}'
+        t.date BETWEEN '{start_date}' AND '{end_date}'
     """
     df = table_to_df(sql=sql)
 
@@ -363,14 +371,15 @@ def trade(code, start_date, buy_pattern, sell_pattern, minimum_buy_threshold, un
         return df_profit, df_buy
     else:
         print(f'\ncode: {code} 売買条件に当てはまるレコードなし\n')
-        return None
+        return None, None
 
 
 def get_args():
     ap = argparse.ArgumentParser()
     ap.add_argument("-o", "--output_dir", type=str, default='output')
     ap.add_argument("-cs", "--codes", type=int, nargs='*', default=[7267])
-    ap.add_argument("-s", "--start_date", type=str, default='2015-01-01')
+    ap.add_argument("-sd", "--start_date", type=str, default='2015-01-01')
+    ap.add_argument("-ed", "--end_date", type=str, default=None)
     ap.add_argument("-bp", "--buy_pattern", type=int, default=2)
     ap.add_argument("-sp", "--sell_pattern", type=int, default=1)
     ap.add_argument("-mbt", "--minimum_buy_threshold", type=int, default=300000)
@@ -391,39 +400,43 @@ if __name__ == '__main__':
     # start_date = '2017-12-31'
 
     output_dir = args['output_dir']
+    os.makedirs(output_dir, exist_ok=True)
 
+    end_date = args['end_date']
+    if end_date is None:
+        end_date = datetime.datetime.today().strftime("%Y-%m-%d")
+
+    # 指定銘柄についてシュミレーション
     df_profit_codes = None
-    df_for_autos = None
     for code in tqdm(codes):
-        df_profit, df_buy = trade(code, args['start_date'], args['buy_pattern'], args['sell_pattern'],
-                                  args['minimum_buy_threshold'], args['under_unit'])
+        df_profit, _ = trade(code, args['start_date'], args['end_date'], args['buy_pattern'], args['sell_pattern'],
+                             args['minimum_buy_threshold'], args['under_unit'])
         if df_profit_codes is None:
             if df_profit is not None:
                 df_profit_codes = df_profit
-
-                # 自動売買用のcsv列作成
-                df_buy_for_auto = set_buy_df_for_auto(df_buy)
-                # print(df_buy_for_auto)
-                df_profit_for_auto = set_sell_df_for_auto(df_profit)
-                # print(df_profit_for_auto)
-                df_for_autos = pd.concat([df_buy_for_auto, df_profit_for_auto], ignore_index=True)
-
         else:
             if df_profit is not None:
                 df_profit_codes = pd.concat([df_profit_codes, df_profit], ignore_index=True)
 
-                # 自動売買用のcsv列作成
-                df_buy_for_auto = set_buy_df_for_auto(df_buy)
-                df_profit_for_auto = set_sell_df_for_auto(df_profit)
-                df_for_auto = pd.concat([df_buy_for_auto, df_profit_for_auto], ignore_index=True)
-                df_for_autos = pd.concat([df_for_autos, df_for_auto], ignore_index=True)
+    # 1日の種銭をdepositとして予算内で買えるものだけに絞る
+    if args['deposit'] != 0:
+        print('INFO: 1日の種銭をdepositとして予算内で買えるものだけに絞る')
+        df_profit_codes_deposit = pd.DataFrame(columns=df_profit_codes.columns)
 
-    os.makedirs(output_dir, exist_ok=True)
+        for buy_date, df_date in df_profit_codes.groupby(['buy_dates']):
+            _deposit = args['deposit']
+            for index, row in df_date.iterrows():
+                if _deposit - row['購入額'] < 0:
+                    break
+                else:
+                    df_profit_codes_deposit = pd.concat([df_profit_codes_deposit, pd.DataFrame([row])], ignore_index=True)
+                    _deposit = _deposit - row['購入額']
+        df_profit_codes = df_profit_codes_deposit
 
-    # 損益確認用csv
+    # 損益確認用csv出力
     df_profit_codes = df_profit_codes.sort_values(by=['buy_dates', 'sell_dates', 'code'])
     df_profit_codes = df_profit_codes[['code', 'buy_dates', 'buy_values',
-                                       'sell_condition2s', 'sell_dates', 'sell_values',
+                                       'sell_condition2s', 'sell_dates', 'sell_values', 'stop_losses', 'set_profits',
                                        '1株あたりの損益', '注文数', '購入額', '売却額', '利益']]
     df_profit_codes.to_csv(os.path.join(output_dir, 'simple_trade_v2.csv'), index=False, encoding='shift-jis')
     print('総利益:', round(df_profit_codes['利益'].sum(), 2))
@@ -432,7 +445,12 @@ if __name__ == '__main__':
     print()
     _ = calc_stock_index(df_profit_codes, profit_col='利益', deposit=args['deposit'])
 
-    # 自動売買用csv
+    # 自動売買用csvの列作成
+    df_buy_for_auto = set_buy_df_for_auto(df_profit_codes[['code', 'buy_dates']].rename(columns={'buy_dates': 'date'}))
+    df_profit_for_auto = set_sell_df_for_auto(df_profit_codes)
+    df_for_autos = pd.concat([df_buy_for_auto, df_profit_for_auto], ignore_index=True)
+
+    # 自動売買用csv出力
     df_for_autos = df_for_autos.dropna(subset=['注文実行日'])
     df_for_autos = df_for_autos.sort_values(by=['注文実行日'])
     df_for_autos['注文番号'] = range(1, df_for_autos.shape[0] + 1)
