@@ -1,0 +1,3 @@
+DB Browser for SQLite：SQLiteの管理ツール
+インストーラー: http://sqlitebrowser.org/
+使い方: https://www.dbonline.jp/sqlite-db-browser/database/index1.html

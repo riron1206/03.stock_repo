@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Yahoo!ファイナンスのCSVファイルの内容をSQLiteに格納
+株価CSVファイルをSQLiteに格納
 https://github.com/BOSUKE/stock_and_python_book/blob/master/chapter2/csv_to_db.py
 Usage:
     1. （コードからでもできるが）DB Browser for SQLiteで、データベース作成+「raw_prices」テーブル作成
