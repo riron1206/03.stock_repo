@@ -137,7 +137,7 @@ def sell_pattern1(df, df_buy):
 
         # ちょうど最終レコードだと計算できないから None入れとく
         if signal_ind == df.shape[0] - 1:
-            buy_dates.append(None)
+            buy_dates.append('signal date is yesterday!!!')
             buy_values.append(None)
             sell_orders.append(None)
             sell_dates.append(None)
@@ -175,6 +175,8 @@ def sell_pattern1(df, df_buy):
             if _row['low'] <= stop_loss:
                 order_date = _row['date']  # 即日注文
                 sell_condition2 = '逆指値'  # 損切
+                sell_date = None
+                sell_value = None
 
                 # 翌日以降に売却
                 for _i, _r in df[_ind + 1: -1].iterrows():
@@ -205,6 +207,8 @@ def sell_pattern1(df, df_buy):
             if df.loc[signal_ind]['close'] < set_profit <= _row['high']:  # highの条件も付けてるから陽線
                 order_date = _row['date']  # 即日注文
                 sell_condition2 = '指値'  # 利確
+                sell_date = None
+                sell_value = None
 
                 # 翌日以降に売却
                 for _i, _r in df[_ind + 1: -1].iterrows():
@@ -372,31 +376,37 @@ def set_sell_df_for_auto(df_profit, kubun='現物'):
 
 def calc_stock_index(df, profit_col='利益', deposit=1000000):
     """ 株価指標計算する """
-    df_win = df[df[profit_col] > 0]
-    df_lose = df[df[profit_col] < 0]
+    df = df.dropna(subset=[profit_col])
+    df[profit_col] = df[profit_col].astype(float)  # 欠損ある型が変わりうまく計算できない時があったので
 
-    winning_percentage = df_win.shape[0] / df.shape[0]
-    print('勝率:', round(winning_percentage, 2), '%')
+    if df.shape[0] > 0:
+        df_win = df[df[profit_col] > 0]
+        df_lose = df[df[profit_col] < 0]
 
-    payoff_ratio = df_win[profit_col].mean() / abs(df_lose[profit_col].mean())
-    print('ペイオフレシオ（勝ちトレードの平均利益額が負けトレードの平均損失額の何倍か）:', round(payoff_ratio, 2))
+        winning_percentage = df_win.shape[0] / df.shape[0]
+        print('勝率:', round(winning_percentage, 2), '%')
 
-    profit_factor = df_win[profit_col].sum() / abs(df_lose[profit_col].sum())
-    print('プロフィットファクター（総利益が総損失の何倍か）:', round(profit_factor, 2))
+        payoff_ratio = df_win[profit_col].mean() / abs(df_lose[profit_col].mean())
+        print('ペイオフレシオ（勝ちトレードの平均利益額が負けトレードの平均損失額の何倍か）:', round(payoff_ratio, 2))
 
-    sharp_ratio = df[profit_col].mean() / df[profit_col].std()
-    print('シャープレシオ（利益のばらつき）:', round(sharp_ratio, 2))
+        profit_factor = df_win[profit_col].sum() / abs(df_lose[profit_col].sum())
+        print('プロフィットファクター（総利益が総損失の何倍か）:', round(profit_factor, 2))
 
-    def calc_max_drawdown(prices):
-        """最大ドローダウンを計算して返す"""
-        cummax_ret = prices.cummax()  # cummax関数: DataFrameまたはSeries軸の累積最大値を求める。あるindexについて、そのindexとそれより前にある全要素の最大値を求めて、その結果をそのindexに格納したSeries（またはDataFrame）を返すメソッド
-        drawdown = cummax_ret - prices  # 日々の総資産額のその日までの最大値とその日の総資産額との差分
-        max_drawdown_date = drawdown.idxmax()  # drawdownの中で最大の値をもつ要素のindexをidxmaxメソッドで求め、そのindexを使って最大ドローダウンの値を求めている
-        return drawdown[max_drawdown_date] / cummax_ret[max_drawdown_date] * 100
-    max_drawdown = calc_max_drawdown(df[profit_col] + deposit)
-    print(f'種銭={deposit//10000}万円としたときの最大ドローダウン（総資産額の最大下落率）:', round(max_drawdown, 2), '%')
+        sharp_ratio = df[profit_col].mean() / df[profit_col].std()
+        print('シャープレシオ（利益のばらつき）:', round(sharp_ratio, 2))
 
-    return winning_percentage, payoff_ratio, profit_factor, sharp_ratio, max_drawdown
+        def calc_max_drawdown(prices):
+            """最大ドローダウンを計算して返す"""
+            cummax_ret = prices.cummax()  # cummax関数: DataFrameまたはSeries軸の累積最大値を求める。あるindexについて、そのindexとそれより前にある全要素の最大値を求めて、その結果をそのindexに格納したSeries（またはDataFrame）を返すメソッド
+            drawdown = cummax_ret - prices  # 日々の総資産額のその日までの最大値とその日の総資産額との差分
+            max_drawdown_date = drawdown.idxmax()  # drawdownの中で最大の値をもつ要素のindexをidxmaxメソッドで求め、そのindexを使って最大ドローダウンの値を求めている
+            return drawdown[max_drawdown_date] / cummax_ret[max_drawdown_date] * 100
+        max_drawdown = calc_max_drawdown(df[profit_col] + deposit)
+        print(f'種銭={deposit//10000}万円としたときの最大ドローダウン（総資産額の最大下落率）:', round(max_drawdown, 2), '%')
+
+        return winning_percentage, payoff_ratio, profit_factor, sharp_ratio, max_drawdown
+    else:
+        print('勝率などは計算できませんでした')
 
 
 def trade(code, start_date, end_date, buy_pattern, sell_pattern, minimum_buy_threshold, under_unit):
@@ -434,6 +444,7 @@ def trade(code, start_date, end_date, buy_pattern, sell_pattern, minimum_buy_thr
         df_buy['注文数'] = [-(-minimum_buy_threshold // (v * under_unit)) * under_unit for v in df_buy['close']]
         df_buy['注文数'] = df_buy['注文数'].astype(int)
 
+        # print(df_buy['date'])
         # 損益計算
         if sell_pattern == 1:
             df_profit = sell_pattern1(df, df_buy)
