@@ -13,11 +13,14 @@ Usage:
     $ python ./simple_trade_v2_for_auto.py -cs 2914 -sd 20190101 -dep 0
     $ python ./simple_trade_v2_for_auto.py -cs 2914 7013 8304 -bp 2 -sd 20141001
     $ python ./simple_trade_v2_for_auto.py -dep 0 -sd 20000101 -cs 7013 8304 3407 2502 2802 4503 6857 6113 6770 8267 7202 5019 8001 4208 4523 5201 9202 6472 9613 9437 6361 8725 2413 6103 9532 3861 4578 1802 6703 9007 6645 7733 4452 6952 1812 9107 7012 9503 2801 7751 6971 4151 2503 6326 3405 8253 9008 9009 9433 5406 1605 9766 4902 6301 1721 7186 4751 2501 3436 6674 5411 5020 6473 3086 4507 8355 4911 7762 1803 9104 4004 4063 8303 5401 9412 7735 7269 7270 5232 4005 5713 6302 8053 5802 8830 6724 1928 9735 4689 3382 2768 6758 8729 9984 8630 4568 8750 6367 1801 7912 4506 5541 5233 6976 1925 8601 8233 2531 4502 8331 4519 9502 8795 2432 3401 6762 4631 4543 4061 6902 4324 5301 9022 3289 8035 8766 9531 9005 8804 9501 4042 5332 9001 9602 5707 5901 3101 3402 5714 4043 7911 7203 8015 4704 7731 9021 2871 1963 4021 7201 2002 3105 6988 5202 5333 4272 5703 1332 6471 3863 5631 4041 2914 9062 6701 5214 9432 2282 6178 9101 8604 1808 6752 7832 9020 6305 6501 7004 7205 9983 6954 8028 8354 5803 6702 6504 4901 5108 5801 7267 8628 7261 8252 1333 8002 8411 7003 4183 5706 8309 8316 8031 8801 3099 4188 7211 7011 8058 9301 8802 6503 5711 8306 6479 2269 6506 9064 7951 7272 3103 6841 5101 6098 7752 8308
+    $ python ./simple_trade_v2_for_auto.py -all  # 全銘柄実行
 """
 import argparse
 import datetime
+import glob
 import os
 import sqlite3
+import pathlib
 import pandas as pd
 from tqdm import tqdm
 import warnings
@@ -383,7 +386,7 @@ def calc_stock_index(df, profit_col='利益', deposit=1000000):
         df_win = df[df[profit_col] > 0]
         df_lose = df[df[profit_col] < 0]
 
-        winning_percentage = df_win.shape[0] / df.shape[0]
+        winning_percentage = (df_win.shape[0] / df.shape[0]) * 100
         print('勝率:', round(winning_percentage, 2), '%')
 
         payoff_ratio = df_win[profit_col].mean() / abs(df_lose[profit_col].mean())
@@ -471,6 +474,7 @@ def get_args():
     ap.add_argument("-uu", "--under_unit", type=int, default=100)
     ap.add_argument("-dep", "--deposit", type=int, default=1000000, help="deposit money.")
     ap.add_argument("-k", "--kubun", type=str, default='現物')
+    ap.add_argument("-all", "--is_all_codes", action='store_const', const=True, default=False, help="all stock flag.")
     return vars(ap.parse_args())
 
 
@@ -482,6 +486,8 @@ if __name__ == '__main__':
     # code = 2914  # JT
     # code = 6758  # Sony
     codes = args['codes']
+    if args['is_all_codes']:
+        codes = [int(pathlib.Path(p).stem) for p in glob.glob(r'D:\DB_Browser_for_SQLite\csvs\kabuoji3\*.csv')]
 
     output_dir = args['output_dir']
     os.makedirs(output_dir, exist_ok=True)
@@ -498,16 +504,23 @@ if __name__ == '__main__':
 
     # 指定銘柄についてシュミレーション
     df_profit_codes = None
+    df_buy_codes = None
     for code in tqdm(codes):
-        df_profit, _ = trade(code, start_date, end_date,
-                             args['buy_pattern'], args['sell_pattern'],
-                             args['minimum_buy_threshold'], args['under_unit'])
+        df_profit, df_buy = trade(code, start_date, end_date,
+                                  args['buy_pattern'], args['sell_pattern'],
+                                  args['minimum_buy_threshold'], args['under_unit'])
+
         if df_profit_codes is None:
             if df_profit is not None:
                 df_profit_codes = df_profit
+                df_buy_codes = df_buy
         else:
             if df_profit is not None:
                 df_profit_codes = pd.concat([df_profit_codes, df_profit], ignore_index=True)
+                df_buy_codes = pd.concat([df_buy_codes, df_buy], ignore_index=True)
+
+    # シグナル日の確認用にcsvファイル一応出しておく
+    df_buy_codes.to_csv(os.path.join(output_dir, 'signal_rows.csv'), index=False, encoding='shift-jis')
 
     # シュミレーション結果あれば後続処理続ける
     if df_profit_codes is not None:
