@@ -6,14 +6,16 @@
 →buy_pattern2() とsell_pattern1() のやり方は持ち金制限なしなら儲かるが、1日の購入金額100万以内にするとマイナスになる
 Usage:
     $ activate stock
+    $ python ./simple_trade_v2_for_auto.py -cs 6091 -bp 2
+    $ python ./simple_trade_v2_for_auto.py -cs 6091 -bp 2_1 -sp 1_1
     $ python ./simple_trade_v2_for_auto.py -cs 4507 -sd 20141001 -ed 20151112
     $ python ./simple_trade_v2_for_auto.py -cs 7013 -bp 2
     $ python ./simple_trade_v2_for_auto.py -sd 20160101 -cs 4151
     $ python ./simple_trade_v2_for_auto.py -cs 2914 -sd 20150101
     $ python ./simple_trade_v2_for_auto.py -cs 2914 -sd 20190101 -dep 0
     $ python ./simple_trade_v2_for_auto.py -cs 2914 7013 8304 -bp 2 -sd 20141001
-    $ python ./simple_trade_v2_for_auto.py -dep 0 -sd 20000101 -cs 7013 8304 3407 2502 2802 4503 6857 6113 6770 8267 7202 5019 8001 4208 4523 5201 9202 6472 9613 9437 6361 8725 2413 6103 9532 3861 4578 1802 6703 9007 6645 7733 4452 6952 1812 9107 7012 9503 2801 7751 6971 4151 2503 6326 3405 8253 9008 9009 9433 5406 1605 9766 4902 6301 1721 7186 4751 2501 3436 6674 5411 5020 6473 3086 4507 8355 4911 7762 1803 9104 4004 4063 8303 5401 9412 7735 7269 7270 5232 4005 5713 6302 8053 5802 8830 6724 1928 9735 4689 3382 2768 6758 8729 9984 8630 4568 8750 6367 1801 7912 4506 5541 5233 6976 1925 8601 8233 2531 4502 8331 4519 9502 8795 2432 3401 6762 4631 4543 4061 6902 4324 5301 9022 3289 8035 8766 9531 9005 8804 9501 4042 5332 9001 9602 5707 5901 3101 3402 5714 4043 7911 7203 8015 4704 7731 9021 2871 1963 4021 7201 2002 3105 6988 5202 5333 4272 5703 1332 6471 3863 5631 4041 2914 9062 6701 5214 9432 2282 6178 9101 8604 1808 6752 7832 9020 6305 6501 7004 7205 9983 6954 8028 8354 5803 6702 6504 4901 5108 5801 7267 8628 7261 8252 1333 8002 8411 7003 4183 5706 8309 8316 8031 8801 3099 4188 7211 7011 8058 9301 8802 6503 5711 8306 6479 2269 6506 9064 7951 7272 3103 6841 5101 6098 7752 8308
-    $ python ./simple_trade_v2_for_auto.py -all  # 全銘柄実行
+    $ python ./simple_trade_v2_for_auto.py -dep 0 -cs 7013 8304 3407 2502 2802 4503 6857 6113 6770 8267 7202 5019 8001 4208 4523 5201 9202 6472 9613 9437 6361 8725 2413 6103 9532 3861 4578 1802 6703 9007 6645 7733 4452 6952 1812 9107 7012 9503 2801 7751 6971 4151 2503 6326 3405 8253 9008 9009 9433 5406 1605 9766 4902 6301 1721 7186 4751 2501 3436 6674 5411 5020 6473 3086 4507 8355 4911 7762 1803 9104 4004 4063 8303 5401 9412 7735 7269 7270 5232 4005 5713 6302 8053 5802 8830 6724 1928 9735 4689 3382 2768 6758 8729 9984 8630 4568 8750 6367 1801 7912 4506 5541 5233 6976 1925 8601 8233 2531 4502 8331 4519 9502 8795 2432 3401 6762 4631 4543 4061 6902 4324 5301 9022 3289 8035 8766 9531 9005 8804 9501 4042 5332 9001 9602 5707 5901 3101 3402 5714 4043 7911 7203 8015 4704 7731 9021 2871 1963 4021 7201 2002 3105 6988 5202 5333 4272 5703 1332 6471 3863 5631 4041 2914 9062 6701 5214 9432 2282 6178 9101 8604 1808 6752 7832 9020 6305 6501 7004 7205 9983 6954 8028 8354 5803 6702 6504 4901 5108 5801 7267 8628 7261 8252 1333 8002 8411 7003 4183 5706 8309 8316 8031 8801 3099 4188 7211 7011 8058 9301 8802 6503 5711 8306 6479 2269 6506 9064 7951 7272 3103 6841 5101 6098 7752 8308
+    $ python ./simple_trade_v2_for_auto.py -dep 0 -all  # 最近のデータだけで全銘柄実行
 """
 import argparse
 import datetime
@@ -21,6 +23,7 @@ import glob
 import os
 import sqlite3
 import pathlib
+import numpy as np
 import pandas as pd
 from tqdm import tqdm
 import warnings
@@ -87,7 +90,6 @@ def buy_pattern2(row):
     - 当日出来高が前日比30%以上増
     - 当日終値が当日の値幅の上位70%以上(大陽線?)
     - 当日終値が25MA乖離率+5％未満
-
     """
     if row['close'] >= row['5MA'] \
         and row['close'] >= row['25MA'] \
@@ -95,6 +97,20 @@ def buy_pattern2(row):
         and row['volume_1diff_rate'] >= 0.3 \
         and row['close'] >= ((row['high'] - row['low']) * 0.7) + row['low'] \
         and (row['close'] - row['25MA']) / row['25MA'] < 0.05:
+        return row
+    else:
+        return pd.Series()
+
+
+def buy_pattern2_1(row, x=20):
+    """
+    買い条件:
+    - buy_pattern2()の条件
+    - 翌日始値が前日終値+x円で指値注文
+    """
+    row = buy_pattern2(row)
+    if row.empty == False:
+        row['buy_limit_price'] = row['close'] + x
         return row
     else:
         return pd.Series()
@@ -122,259 +138,361 @@ def buy_pattern3(row):
         return pd.Series()
 
 
-def sell_pattern1(df, df_buy):
+def sell_pattern_calc_profit_loss(df, df_sell):
     """
-    売り条件:
-    - 購入シグナルの出た前日or当日の安値の-5円を底値として、下回ったら翌日以降に逆指値で損切
-    - シグナル当日の25MAとの乖離(+5～+8%)を最高値として、超えたら翌日以降に指値で利確
-    - シグナル当日終値の上にある75MA、200MAに最新データがタッチ → 翌日寄付売却（利確）
-    - 陰線の終値で最新データが5MAを(0.3～0.5)%割込む → 翌日寄付売却（損切）
+    sell_pattern()の損益計算
+    Args:
+        df: 1銘柄の株価データ
+        df_sell: sell_pattern()のデータフレーム
+        　　　　　※注文するIDOCOの利確・損切値、通常指値、通常逆指値の値の列を持つ形じゃないと動かない
     """
-    # df['date'] = pd.to_datetime(df['date'])
-    buy_dates, buy_values = [], []
-    # sell_order0s = []
-    sell_orders, sell_dates, sell_values, sell_condition2s = [], [], [], []
-    stop_losses, set_profits = [], []
 
-    for signal_ind in df_buy.index:
+    buy_dates, buy_values, units = [], [], []
+    sell_orders, sell_dates, sell_values, sell_condition1s, sell_condition2s = [], [], [], [], []
 
-        # ちょうど最終レコードだと計算できないから None入れとく
+    for signal_ind in df_sell.index:
+
+        # シグナルがちょうど最終レコードだと、次の日購入の計算はできないから None入れとく
         if signal_ind == df.shape[0] - 1:
-            buy_dates.append('signal date is yesterday!!!')
+            _today = df.loc[signal_ind]['date']
+            _tomorrow = datetime.datetime.strptime(_today, '%Y-%m-%d').date() + datetime.timedelta(days=1)
+            _tomorrow = _tomorrow.strftime("%Y-%m-%d")
+            buy_dates.append(_tomorrow)
+            sell_orders.append(_tomorrow)
+            units.append(df_sell.loc[signal_ind]['注文数'])
             buy_values.append(None)
-            sell_orders.append(None)
             sell_dates.append(None)
             sell_values.append(None)
+            sell_condition1s.append(None)
             sell_condition2s.append(None)
-            stop_losses.append(None)
-            set_profits.append(None)
             continue
 
-        # 購入シグナルの次の日に購入
-        buy_dates.append(df.loc[signal_ind + 1]['date'])
-        buy_values.append(df.loc[signal_ind + 1]['open'])
+        # 通常の逆指値、通常の指値、IFDOCOの損切ライン、
+        stop_loss = df_sell.loc[signal_ind]['stop_loss']
+        limit_price = df_sell.loc[signal_ind]['limit_price']
+        ifdoco_stop_loss = df_sell.loc[signal_ind]['ifdoco_stop_loss']
+        ifdoco_set_profit = df_sell.loc[signal_ind]['ifdoco_set_profit']
 
-        # 購入シグナルの出た前日or当日の安値の-5円を逆指値の底値とする（損切）
-        stop_loss1 = df.loc[signal_ind - 1]['low'] - 5
-        stop_loss2 = df.loc[signal_ind]['low'] - 5
-        if stop_loss1 < stop_loss2:
-            stop_loss = stop_loss2
+        # 買いが指値か成行か. buy_limit_price列あれば指値で買う
+        buy_ind = None
+        if 'buy_limit_price' in df_sell.columns:
+            # 指値
+            # シグナル翌日から株価のデータフレームループ
+            for _ind, _row in df[signal_ind + 1:].iterrows():
+
+                # 翌営業日の始値が指値未満なら購入できない
+                if _row['open'] < df_sell.loc[signal_ind]['buy_limit_price']:
+                    continue
+
+                buy_dates.append(_row['date'])
+                sell_orders.append(_row['date'])
+                buy_values.append(_row['open'])
+                buy_ind = _ind
+                break
         else:
-            stop_loss = stop_loss1
-        stop_losses.append(stop_loss)
+            # 成行
+            # 翌営業日に購入
+            buy_dates.append(df.loc[signal_ind + 1]['date'])
+            # 注文日は購入日と同じにする
+            sell_orders.append(df.loc[signal_ind + 1]['date'])
+            # 購入金額はシグナルの次の日の始値
+            buy_values.append(df.loc[signal_ind + 1]['open'])
+            # 購入日のインデックス
+            buy_ind = signal_ind + 1
 
-        # 購入シグナル当日の25MAとの乖離(+5～+8%)を超えた値を逆指値の最大値とする(利確)
-        set_profit = df.loc[signal_ind]['25MA'] * 1.08  # 8%にしておく
-        set_profits.append(set_profit)
+        if buy_ind is None:
+            continue
 
-        # 逆指値の損切、利確の注文日は購入日と同じにする？
-        # sell_order = df.loc[signal_ind + 1]['date']
-        # sell_order0s.append(sell_order)
+        # 注文数
+        units.append(df_sell.loc[signal_ind]['注文数'])
 
-        # 購入シグナルの次の日（購入日）から株価のデータフレームループ
-        for _ind, _row in df[signal_ind + 1: -1].iterrows():
+        # 購入日から株価のデータフレームループ
+        for _ind, _row in df[buy_ind:].iterrows():
 
-            # 安値か高値が損切ラインにタッチor下回るか
-            if _row['low'] <= stop_loss:
-                order_date = _row['date']  # 即日注文
+            # ------------ 通常逆指値 通常の逆指値を下回るか ------------ #
+            if _row['close'] <= stop_loss:
+                sell_condition1 = '通常'
                 sell_condition2 = '逆指値'  # 損切
+                sell_date = _row['date']
+                sell_value = stop_loss
+                # 始値も stop_loss 下回った場合
+                if _row['open'] <= stop_loss:
+                    sell_value = _row['open']
+
+                sell_dates.append(sell_date)
+                sell_values.append(sell_value)
+                sell_condition1s.append(sell_condition1)
+                sell_condition2s.append(sell_condition2)
+                break
+
+            # ------------ 通常指値 通常の指値を上回るか ------------ #
+            if _row['high'] >= limit_price:
+                sell_condition1 = '通常'
+                sell_condition2 = '指値'
+                sell_date = _row['date']
+                sell_value = limit_price
+                # 始値も limit_price 上回った場合
+                if _row['open'] >= limit_price:
+                    sell_value = _row['open']
+
+                sell_dates.append(sell_date)
+                sell_values.append(sell_value)
+                sell_condition1s.append(sell_condition1)
+                sell_condition2s.append(sell_condition2)
+                break
+
+            # ------------ IFDOCOの損切ラインを下回るか ------------ #
+            if _row['low'] <= ifdoco_stop_loss:
+                sell_condition1 = 'IFDOCO'
+                sell_condition2 = '成行'
                 sell_date = None
                 sell_value = None
 
-                # 翌日以降に売却
-                for _i, _r in df[_ind + 1: -1].iterrows():
+                # 当日以降に売却
+                for _i, _r in df[_ind:].iterrows():
                     sell_date = df.loc[_i]['date']
                     sell_value = None
                     # その日中に stop_loss 下回った場合
-                    if df.loc[_i]['low'] <= stop_loss and df.loc[_i]['open'] >= stop_loss:
-                        sell_value = stop_loss
+                    if df.loc[_i]['low'] <= ifdoco_stop_loss and df.loc[_i]['open'] >= ifdoco_stop_loss:
+                        sell_value = ifdoco_stop_loss
                         break
                     # 始値が stop_loss 下回った場合
-                    if df.loc[_i]['open'] < stop_loss:
+                    if df.loc[_i]['open'] < ifdoco_stop_loss:
                         sell_value = df.loc[_i]['open']
                         break
 
-                # sell_date = _row['date']  # 即日損切
-                # sell_value = stop_loss
-                # # 高値も損切を下回る場合（ストップ安とかの時）
-                # if _row['high'] <= stop_loss:
-                #     sell_value = _row['close']  # 終値で売却
-
-                sell_orders.append(order_date)
                 sell_dates.append(sell_date)
                 sell_values.append(sell_value)
+                sell_condition1s.append(sell_condition1)
                 sell_condition2s.append(sell_condition2)
                 break
 
-            # 利確ライン上回るか
-            if df.loc[signal_ind]['close'] < set_profit <= _row['high']:  # highの条件も付けてるから陽線
-                order_date = _row['date']  # 即日注文
-                sell_condition2 = '指値'  # 利確
+            # ------------ IFDOCOの利確ライン上回るか ------------ #
+            if _row['high'] >= ifdoco_set_profit:
+                sell_condition1 = 'IFDOCO'
+                sell_condition2 = '成行'
                 sell_date = None
                 sell_value = None
 
-                # 翌日以降に売却
-                for _i, _r in df[_ind + 1: -1].iterrows():
+                # 当日以降に売却
+                for _i, _r in df[_ind:].iterrows():
                     sell_date = df.loc[_i]['date']
                     sell_value = None
                     # その日中に set_profit 上回った場合
-                    if df.loc[_i]['high'] >= set_profit and df.loc[_i]['open'] <= set_profit:
-                        sell_value = set_profit
+                    if df.loc[_i]['high'] >= ifdoco_set_profit and df.loc[_i]['open'] <= ifdoco_set_profit:
+                        sell_value = ifdoco_set_profit
                         break
                     # 始値が set_profit 上回った場合
-                    if df.loc[_i]['open'] > set_profit:
+                    if df.loc[_i]['open'] > ifdoco_set_profit:
                         sell_value = df.loc[_i]['open']
                         break
 
-                # sell_date = _row['date']  # 即日利確
-                # sell_value = set_profit
-                # # 安値も利確を超えた値の場合（ストップ高とかの時）
-                # if _row['low'] >= set_profit:
-                #     sell_value = _row['close']  # 終値で売却
-
-                sell_orders.append(order_date)  # 購入時に注文
                 sell_dates.append(sell_date)
                 sell_values.append(sell_value)
+                sell_condition1s.append(sell_condition1)
                 sell_condition2s.append(sell_condition2)
                 break
 
-            # シグナル当日終値の上にある75MA、200MAに最新データがタッチしたら、その日の夜に注文出して、翌日寄付に売却（利確）
-            if (df.loc[signal_ind]['close'] <= df.iloc[signal_ind]['75MA'] <= _row['high']) \
-                or (df.loc[signal_ind]['close'] <= df.iloc[signal_ind]['200MA'] <= _row['high']):
-                order_date = _row['date']  # 即日注文
-                sell_condition2 = '成行'  # 利確
-                sell_date = df.loc[_ind + 1]['date']  # 翌日始値で利確
-                sell_value = df.loc[_ind + 1]['open']
+    # 後処理
+    # print(len(sell_dates), len(buy_dates))
+    if len(sell_dates) < len(buy_dates):
+        for i in range(len(buy_dates) - len(sell_dates)):
+            sell_dates.append(None)
+            sell_values.append(None)
+            sell_condition1s.append(None)
+            sell_condition2s.append(None)
 
-                sell_orders.append(order_date)
-                sell_dates.append(sell_date)
-                sell_values.append(sell_value)
-                sell_condition2s.append(sell_condition2)
-                break
-
-            # 陰線の終値で最新データが5MAを(0.3～0.5)%割込んだら、その日の夜に注文出して、翌日寄付に売却（損切）
-            if df.iloc[signal_ind]['5MA'] < df.iloc[signal_ind]['close'] \
-                and _row['5MA'] >= _row['close']:
-                order_date = _row['date']  # 即日注文
-                sell_condition2 = '成行'  # 損切
-                sell_date = df.loc[_ind + 1]['date']  # 翌日始値で損切
-                sell_value = df.loc[_ind + 1]['open']
-
-                sell_orders.append(order_date)
-                sell_dates.append(sell_date)
-                sell_values.append(sell_value)
-                sell_condition2s.append(sell_condition2)
-                break
-
-        # print(df_buy)
-        # print(buy_dates, sell_orders, sell_date, sell_value, sell_condition2, stop_losses, set_profits)
-        # print(len(sell_orders), len(sell_dates), len(sell_values), len(sell_condition2s))
-        # 後処理
-        if len(sell_dates) < len(buy_dates):
-            for i in range(len(buy_dates) - len(sell_dates)):
-                sell_orders.append(None)
-                sell_dates.append(None)
-                sell_values.append(None)
-                sell_condition2s.append(None)
+    # print(df_buy)
+    # print('buy_dates', buy_dates)
+    # print('buy_values', buy_values)
+    # print('sell_orders', sell_orders)
+    # print('sell_condition1s', sell_condition1s)
+    # print('sell_condition2s', sell_condition2s)
+    # print('sell_dates', sell_dates)
+    # print('sell_values', sell_values)
+    # print('units', units)
+    # print('buy_dates', len(buy_dates))
+    # print('buy_values', len(buy_values))
+    # print('sell_orders', len(sell_orders))
+    # print('sell_condition1s', len(sell_condition1s))
+    # print('sell_condition2s', len(sell_condition2s))
+    # print('sell_dates', len(sell_dates))
+    # print('sell_values', len(sell_values))
+    # print('units', len(units))
 
     df_profit = pd.DataFrame({'buy_dates': buy_dates,
-                              'buy_values': buy_values,  # 'sell_order0s': sell_order0s,
+                              'buy_values': buy_values,
                               'sell_orders': sell_orders,
+                              'sell_condition1s': sell_condition1s,
                               'sell_condition2s': sell_condition2s,
                               'sell_dates': sell_dates,
                               'sell_values': sell_values,
-                              'stop_losses': stop_losses,
-                              'set_profits': set_profits,
-                              '注文数': df_buy['注文数']})  # .dropna(how='any')
+                              '注文数': units})  # .dropna(how='any')
 
     df_profit['1株あたりの損益'] = df_profit['sell_values'] - df_profit['buy_values']
     df_profit['購入額'] = df_profit['buy_values'] * df_profit['注文数']
     df_profit['売却額'] = df_profit['sell_values'] * df_profit['注文数']
     df_profit['利益'] = df_profit['売却額'] - df_profit['購入額']
+
     return df_profit
 
 
-def set_buy_df_for_auto(df_buy, kubun='現物', buy_date_col='buy_dates'):
+def sell_pattern1(df, df_buy):
+    """
+    売り条件:
+    - 購入シグナルの出た前日or当日の安値の-5円を下回ったら損切
+    - 購入シグナル当日の25MAの+5～+8%を超えたら利確
+    - 購入シグナル当日終値の上にある75MAと200MAに最新データがタッチしたら利確
+    - 5MAを割込んだら損切
+
+    Args:
+        df: 1銘柄の株価データ
+        df_buy: dfの購入シグナルが出た行だけを取り出したデータフレーム
+    Returns:
+        df_sell: dfの購入シグナルインデックス、注文するIDOCOの利確・損切値、通常指値、通常逆指値の値を詰めたデータフレーム
+    """
+    df_sell = pd.DataFrame(columns=['signal_ind',
+                                    'ifdoco_set_profit', 'ifdoco_stop_loss',
+                                    'limit_price',
+                                    'stop_loss'])
+    for signal_ind in df_buy.index:
+
+        # 購入シグナル当日の25MAとの乖離(+5～+8%)を超えた値をIFDOCO-成行の利確とする(利確)
+        ifdoco_set_profit = df.loc[signal_ind]['25MA'] * 1.08  # 8%にしておく
+
+        # 購入シグナルの出た前日or当日の安値の-5円をIFDOCO-成行の損切とする（損切）
+        stop_loss1 = df.loc[signal_ind - 1]['low'] - 5
+        stop_loss2 = df.loc[signal_ind]['low'] - 5
+        if stop_loss1 < stop_loss2:
+            ifdoco_stop_loss = stop_loss2
+        else:
+            ifdoco_stop_loss = stop_loss1
+
+        # シグナル当日終値の上にある75MA、200MAの大きい方を通常-指値とする(利確)
+        if (df.loc[signal_ind]['close'] <= df.iloc[signal_ind]['75MA']) \
+            or (df.loc[signal_ind]['close'] <= df.iloc[signal_ind]['200MA']):
+
+            if df.iloc[signal_ind]['75MA'] > df.iloc[signal_ind]['200MA']:
+                limit_price = df.iloc[signal_ind]['75MA']
+            else:
+                limit_price = df.iloc[signal_ind]['200MA']
+        else:
+            limit_price = None
+
+        # シグナル当日の終値の下にある5MAを通常-逆指値とする（損切）
+        if df.iloc[signal_ind]['5MA'] < df.iloc[signal_ind]['close']:
+            stop_loss = df.iloc[signal_ind]['5MA']
+        else:
+            stop_loss = None
+
+        row = pd.Series([signal_ind, ifdoco_set_profit, ifdoco_stop_loss, limit_price, stop_loss], index=df_sell.columns)
+        df_sell = df_sell.append(row, ignore_index=True)
+
+    df_sell.index = df_sell['signal_ind'].astype(int).values
+    df_sell = df_sell.drop(['signal_ind'], axis=1)
+    df_sell['注文数'] = df_buy['注文数']
+    df_sell['code'] = df_buy['code']
+    df_sell['date'] = df_buy['date']
+    # print(df_sell)
+    return df_sell
+
+
+def sell_pattern1_1(df, df_buy):
+    """
+    売り条件:
+    - sell_pattern1()の条件
+    - 買いの指値列をつけて指値で買う
+    """
+    df_sell = sell_pattern1(df, df_buy)
+    df_sell['buy_limit_price'] = df_buy['buy_limit_price']
+    return df_sell
+
+
+def set_buy_df_for_auto(df_buy, kubun='現物'):
     """ 自動売買用のcsv列作成 買い用 """
     df_buy = df_buy.reset_index(drop=True).reset_index()
     df_buy = df_buy.rename(columns={'index': '注文番号', 'code': '証券コード'})
     df_buy['注文番号'] = df_buy['注文番号'] + 1
-    df_buy['システム注文日'] = df_buy[buy_date_col]
+    df_buy['シグナル日'] = df_buy['date']
     df_buy['取引方法'] = '新規'
     df_buy['取引区分'] = kubun + '買い'
     df_buy['信用取引区分'] = ''
     df_buy['注文条件１'] = '通常'
-    df_buy['注文条件２'] = '成行'
-    df_buy['指値'] = ''
+
+    if df_buy['buy_limit_price'].all() == 0:
+        df_buy['注文条件２'] = '成行'
+        df_buy['指値'] = ''
+    else:
+        df_buy['注文条件２'] = '指値'
+        df_buy['指値'] = df_buy['buy_limit_price']
+
     df_buy['利確'] = ''
     df_buy['損切'] = ''
     df_buy['注文日'] = ''
     df_buy['約定日'] = ''
-    df_buy = df_buy.sort_values(by=['システム注文日'])
+    df_buy = df_buy.sort_values(by=['シグナル日'])
     return df_buy
 
 
-def set_sell_df_for_auto(df_profit, kubun='現物'):
+def set_sell_df_for_auto(df_sell, kubun='現物'):
     """ 自動売買用のcsv列作成 手じまい用 """
-    df_profit = df_profit.reset_index(drop=True).reset_index()
-    df_profit = df_profit.rename(columns={'index': '注文番号', 'code': '証券コード'})
-    df_profit['注文番号'] = df_profit['注文番号'] + 1
-    df_profit['取引方法'] = '新規'  # '手仕舞い'
-    df_profit['取引区分'] = kubun + '売り'
-    df_profit['信用取引区分'] = ''
+    df = pd.DataFrame()
 
-    _order_expects = []  # システム注文日
-    _sell_condition1s = []  # 注文条件１
-    _sell_condition2s = []  # 注文条件２
-    _sell_values = []  # 指値
-    _set_profits = []  # 利確
-    _stop_losses = []  # 損切
-    for row in df_profit.itertuples(index=False):
+    dates = []  # システム注文日
+    codes = []  # 証券コード
+    units = []  # 注文数
+    sell_condition1s = []  # 注文条件１
+    sell_condition2s = []  # 注文条件２
+    limit_prices = []  # 指値
+    set_profits = []  # 利確
+    stop_losses = []  # 損切
 
-        if row.sell_condition2s is not None:
-            _order_expects.append(row.sell_orders)
+    for ind, row in df_sell.iterrows():
 
-            if row.sell_condition2s == '成行':
-                _sell_condition2s.append(row.sell_condition2s)
-                _sell_values.append(None)
+        dates.append(row['date'])
+        codes.append(row['code'])
+        units.append(row['注文数'])
+        sell_condition1s.append('IFDOCO')
+        sell_condition2s.append('成行')
+        limit_prices.append(None)
+        set_profits.append(row['ifdoco_set_profit'])
+        stop_losses.append(row['ifdoco_stop_loss'])
 
-            if row.sell_condition2s == '指値':
-                _sell_condition2s.append(row.sell_condition2s)
-                _sell_values.append(row.set_profits)
+        if np.isnan(row['limit_price']) == False:
+            dates.append(row['date'])
+            codes.append(row['code'])
+            units.append(row['注文数'])
+            sell_condition1s.append('通常')
+            sell_condition2s.append('指値')
+            limit_prices.append(row['limit_price'])
+            set_profits.append(None)
+            stop_losses.append(None)
 
-            if row.sell_condition2s == '逆指値':
-                _sell_condition2s.append(row.sell_condition2s)
-                _sell_values.append(row.stop_losses)
+        if np.isnan(row['stop_loss']) == False:
+            dates.append(row['date'])
+            codes.append(row['code'])
+            units.append(row['注文数'])
+            sell_condition1s.append('通常')
+            sell_condition2s.append('逆指値')
+            limit_prices.append(row['stop_loss'])
+            set_profits.append(None)
+            stop_losses.append(None)
 
-            if row.stop_losses < row.buy_values < row.set_profits:
-                _sell_condition1s.append('IFDOCO')
-                _set_profits.append(row.set_profits)
-                _stop_losses.append(row.stop_losses)
-            else:
-                _sell_condition1s.append('通常')
-                _set_profits.append(None)
-                _stop_losses.append(None)
-        else:
-            _order_expects.append(None)
-            _sell_condition1s.append(None)
-            _sell_condition2s.append(None)
-            _sell_values.append(None)
-            _set_profits.append(None)
-            _stop_losses.append(None)
-
-    df_profit['システム注文日'] = _order_expects
-    df_profit['注文条件１'] = _sell_condition1s
-    df_profit['注文条件２'] = _sell_condition2s
-    df_profit['指値'] = _sell_values
-    # df_profit['指値'] = df_profit['指値'].astype(int)
-    df_profit['利確'] = _set_profits
-    # df_profit['利確'] = df_profit['利確'].astype(int)
-    df_profit['損切'] = _stop_losses
-    # df_profit['損切'] = df_profit['損切'].astype(int)
-    df_profit['注文日'] = ''
-    df_profit['約定日'] = ''
-    df_profit = df_profit.sort_values(by=['システム注文日'])
-    return df_profit
+    df['シグナル日'] = dates
+    df['注文番号'] = range(len(dates))
+    df['証券コード'] = codes
+    df['取引方法'] = '新規'  # '手仕舞い'
+    df['取引区分'] = kubun + '売り'
+    df['信用取引区分'] = ''
+    df['注文数'] = units
+    df['注文条件１'] = sell_condition1s
+    df['注文条件２'] = sell_condition2s
+    df['指値'] = limit_prices
+    df['利確'] = set_profits
+    df['損切'] = stop_losses
+    df['注文日'] = ''
+    df['約定日'] = ''
+    return df.sort_values(by=['シグナル日'])
 
 
 def calc_stock_index(df, profit_col='利益', deposit=1000000):
@@ -387,7 +505,7 @@ def calc_stock_index(df, profit_col='利益', deposit=1000000):
         df_lose = df[df[profit_col] < 0]
 
         winning_percentage = (df_win.shape[0] / df.shape[0]) * 100
-        print('勝率:', round(winning_percentage, 2), '%')
+        print('勝率:', round(winning_percentage, 2), '%', f'(勝ち={df_win.shape[0]}回, 負け={df_lose.shape[0]}回)')
 
         payoff_ratio = df_win[profit_col].mean() / abs(df_lose[profit_col].mean())
         print('ペイオフレシオ（勝ちトレードの平均利益額が負けトレードの平均損失額の何倍か）:', round(payoff_ratio, 2))
@@ -431,12 +549,15 @@ def trade(code, start_date, end_date, buy_pattern, sell_pattern, minimum_buy_thr
     df['volume_1diff_rate'] = (df['volume'] - df['volume'].shift(1).fillna(0)) / df['volume']  # 前日比出来高
     df['open_close_1diff'] = df['open'].shift(-1).fillna(0) - df['close']  # 翌日始値-当日終値
     df['high_shift_1'] = df['high'].shift(-1).fillna(0)  # 翌日高値
+    df['buy_limit_price'] = 0  # 買いの指値の値
 
     # pattern関数の条件にマッチしたレコードだけ抽出（購入）
     if buy_pattern == 1:
         df_buy = df.apply(buy_pattern1, axis=1).dropna(how='any')
     elif buy_pattern == 2:
         df_buy = df.apply(buy_pattern2, axis=1).dropna(how='any')
+    elif buy_pattern == 2_1:
+        df_buy = df.apply(buy_pattern2_1, axis=1).dropna(how='any')
     elif buy_pattern == 3:
         df_buy = df.apply(buy_pattern3, axis=1).dropna(how='any')
 
@@ -450,16 +571,21 @@ def trade(code, start_date, end_date, buy_pattern, sell_pattern, minimum_buy_thr
         # print(df_buy['date'])
         # 損益計算
         if sell_pattern == 1:
-            df_profit = sell_pattern1(df, df_buy)
+            df_sell = sell_pattern1(df, df_buy)
+        if sell_pattern == 1_1:
+            df_sell = sell_pattern1_1(df, df_buy)
+
+        # 損益計算
+        df_profit = sell_pattern_calc_profit_loss(df, df_sell)
 
         # print(df_profit)
         print(f"code: {code} 利益: {round(df_profit['利益'].sum())}\n")
 
         df_profit['code'] = code
-        return df_profit, df_buy
+        return df_profit, df_sell, df_buy
     else:
         print(f'\ncode: {code} 売買条件に当てはまるレコードなし\n')
-        return None, None
+        return None, None, None
 
 
 def get_args():
@@ -503,65 +629,69 @@ if __name__ == '__main__':
     print('start_date, end_date', start_date, end_date)
 
     # 指定銘柄についてシュミレーション
-    df_profit_codes = None
-    df_buy_codes = None
+    df_profits = None
+    df_sells = None
+    df_buys = None
     for code in tqdm(codes):
-        df_profit, df_buy = trade(code, start_date, end_date,
-                                  args['buy_pattern'], args['sell_pattern'],
-                                  args['minimum_buy_threshold'], args['under_unit'])
-
-        if df_profit_codes is None:
+        df_profit, df_sell, df_buy = trade(code, start_date, end_date,
+                                           args['buy_pattern'], args['sell_pattern'],
+                                           args['minimum_buy_threshold'], args['under_unit'])
+        if df_profits is None:
             if df_profit is not None:
-                df_profit_codes = df_profit
-                df_buy_codes = df_buy
+                df_profits = df_profit
+                df_sells = df_sell
+                df_buys = df_buy
         else:
             if df_profit is not None:
-                df_profit_codes = pd.concat([df_profit_codes, df_profit], ignore_index=True)
-                df_buy_codes = pd.concat([df_buy_codes, df_buy], ignore_index=True)
-
-    # シグナル日の確認用にcsvファイル一応出しておく
-    df_buy_codes.to_csv(os.path.join(output_dir, 'signal_rows.csv'), index=False, encoding='shift-jis')
+                df_profits = pd.concat([df_profits, df_profit], ignore_index=True)
+                df_sells = pd.concat([df_sells, df_sell], ignore_index=True)
+                df_buys = pd.concat([df_buys, df_buy], ignore_index=True)
 
     # シュミレーション結果あれば後続処理続ける
-    if df_profit_codes is not None:
+    if df_profits is not None:
+
+        # シグナル日の確認用にcsvファイル一応出しておく
+        df_buys.to_csv(os.path.join(output_dir, 'signal_rows.csv'), index=False, encoding='shift-jis')
 
         # 1日の種銭をdepositとして予算内で買えるものだけに絞る
         if args['deposit'] != 0:
-            print('INFO: 1日の種銭をdepositとして予算内で買えるものだけに絞る')
-            df_profit_codes_deposit = pd.DataFrame(columns=df_profit_codes.columns)
+            print(f"INFO: 1日の種銭を{args['deposit']//10000}万円として予算内で買えるものだけに絞る")
+            df_profits_deposit = pd.DataFrame(columns=df_profits.columns)
 
-            for buy_date, df_date in df_profit_codes.groupby(['buy_dates']):
+            for buy_date, df_date in df_profits.groupby(['buy_dates']):
                 _deposit = args['deposit']
                 for index, row in df_date.iterrows():
                     if _deposit - row['購入額'] < 0:
                         break
                     else:
-                        df_profit_codes_deposit = pd.concat([df_profit_codes_deposit, pd.DataFrame([row])], ignore_index=True)
+                        df_profits_deposit = pd.concat([df_profits_deposit, pd.DataFrame([row])], ignore_index=True)
                         _deposit = _deposit - row['購入額']
-            df_profit_codes = df_profit_codes_deposit
+            df_profits = df_profits_deposit
 
         # 損益確認用csv出力
-        df_profit_codes = df_profit_codes.sort_values(by=['buy_dates', 'sell_dates', 'code'])
-        df_profit_codes = df_profit_codes[['code', 'buy_dates', 'buy_values',
-                                           'sell_orders', 'sell_condition2s',
-                                           'sell_dates', 'sell_values', 'stop_losses', 'set_profits',
-                                           '1株あたりの損益', '注文数', '購入額', '売却額', '利益']]  # 'sell_order0s',
-        df_profit_codes.to_csv(os.path.join(output_dir, 'simple_trade_v2.csv'), index=False, encoding='shift-jis')
-        print('総利益:', round(df_profit_codes['利益'].sum(), 2))
+        df_profits = df_profits.sort_values(by=['buy_dates', 'sell_dates', 'code'])
+        df_profits = df_profits[['code', 'buy_dates', 'buy_values',
+                                 'sell_orders',
+                                 'sell_condition1s', 'sell_condition2s',
+                                 'sell_dates', 'sell_values',
+                                 '1株あたりの損益', '注文数', '購入額', '売却額', '利益']]  # 'sell_order0s',
+        df_profits.to_csv(os.path.join(output_dir, 'simple_trade_v2.csv'), index=False, encoding='shift-jis')
+        print('総利益:', round(df_profits['利益'].sum(), 2))
 
         # 株価指標計算
         print()
-        _ = calc_stock_index(df_profit_codes, profit_col='利益', deposit=args['deposit'])
+        _ = calc_stock_index(df_profits, profit_col='利益', deposit=args['deposit'])
 
         # 自動売買用csvの列作成
-        df_buy_for_auto = set_buy_df_for_auto(df_profit_codes[['code', 'buy_dates']], kubun=args['kubun'])
-        df_profit_for_auto = set_sell_df_for_auto(df_profit_codes, kubun=args['kubun'])
-        df_for_autos = pd.concat([df_buy_for_auto, df_profit_for_auto], ignore_index=True)
+        df_buy_for_auto = set_buy_df_for_auto(df_buys, kubun=args['kubun'])
+        df_sell_for_auto = set_sell_df_for_auto(df_sells, kubun=args['kubun'])
+        df_for_autos = pd.concat([df_buy_for_auto, df_sell_for_auto], ignore_index=True)
 
         # 自動売買用csv出力
-        df_for_autos = df_for_autos.dropna(subset=['システム注文日'])
-        df_for_autos = df_for_autos.sort_values(by=['システム注文日'])
+        df_for_autos = df_for_autos.dropna(subset=['シグナル日'])
+        df_for_autos = df_for_autos.sort_values(by=['取引区分'], ascending=False)
+        df_for_autos = df_for_autos.sort_values(by=['シグナル日', '証券コード'])
         df_for_autos['注文番号'] = range(1, df_for_autos.shape[0] + 1)
-        df_for_autos = df_for_autos[['システム注文日', '注文番号', '証券コード', '取引方法', '取引区分', '信用取引区分',
+        df_for_autos = df_for_autos[['シグナル日', '注文番号', '証券コード', '取引方法', '取引区分', '信用取引区分',
                                     '注文数', '注文条件１', '注文条件２', '指値', '利確', '損切', '注文日', '約定日']]
         df_for_autos.to_csv(os.path.join(output_dir, 'auto_order.csv'), index=False, encoding='shift-jis')
