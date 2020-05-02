@@ -102,6 +102,33 @@ def buy_pattern2(row):
         return pd.Series()
 
 
+def edit_df_buy_pattern2(df_buy, df_sell):
+    """ buy_pattern2()のdf_buyに注文条件１, 注文条件２, 利確, 損切を入れる """
+
+    df_buy = pd.merge(df_buy, df_sell, on=['code', 'date', '注文数'])
+
+    for _ind, _row in df_buy.fillna(0).iterrows():
+        # 通常の逆指値、通常の指値、IFDOCOの損切ライン、
+        stop_loss = _row['stop_loss']
+        limit_price = _row['limit_price']
+        ifdoco_stop_loss = _row['ifdoco_stop_loss']
+        ifdoco_set_profit = _row['ifdoco_set_profit']
+        # print(stop_loss, limit_price, ifdoco_stop_loss, ifdoco_set_profit)
+
+        df_buy.at[_ind, '損切'] = ifdoco_stop_loss
+        if stop_loss > ifdoco_stop_loss:
+            df_buy.at[_ind, '損切'] = stop_loss
+
+        df_buy.at[_ind, '利確'] = ifdoco_set_profit
+        if 0 < limit_price < ifdoco_set_profit:
+            df_buy.at[_ind, '利確'] = limit_price
+
+        df_buy.at[_ind, '注文条件１'] = 'IFDOCO'
+        df_buy.at[_ind, '注文条件２'] = '成行'
+
+    return df_buy
+
+
 def buy_pattern2_1(row, x=20):
     """
     買い条件:
@@ -408,6 +435,34 @@ def sell_pattern1_1(df, df_buy):
     return df_sell
 
 
+def edit_df_sell_pattern1_1(df_buy, df_sell):
+    """ sell_pattern1_1()のdf_buyに会うように注文条件１, 注文条件２, 利確, 損切を入れる """
+
+    df_buy = pd.merge(df_buy, df_sell, on=['code', 'date', '注文数'])
+    df_buy = df_buy.rename(columns={'buy_limit_price_x': 'buy_limit_price'})
+
+    for _ind, _row in df_buy.fillna(0).iterrows():
+        # 通常の逆指値、通常の指値、IFDOCOの損切ライン、
+        stop_loss = _row['stop_loss']
+        limit_price = _row['limit_price']
+        ifdoco_stop_loss = _row['ifdoco_stop_loss']
+        ifdoco_set_profit = _row['ifdoco_set_profit']
+        # print(stop_loss, limit_price, ifdoco_stop_loss, ifdoco_set_profit)
+
+        df_buy.at[_ind, '損切'] = ifdoco_stop_loss
+        if stop_loss > ifdoco_stop_loss:
+            df_buy.at[_ind, '損切'] = stop_loss
+
+        df_buy.at[_ind, '利確'] = ifdoco_set_profit
+        if 0 < limit_price < ifdoco_set_profit:
+            df_buy.at[_ind, '利確'] = limit_price
+
+        df_buy.at[_ind, '注文条件１'] = 'IFDOCO'
+        df_buy.at[_ind, '注文条件２'] = '成行'
+
+    return df_buy
+
+
 def set_buy_df_for_auto(df_buy, kubun='現物'):
     """ 自動売買用のcsv列作成 買い用 """
     df_buy = df_buy.reset_index(drop=True).reset_index()
@@ -417,17 +472,14 @@ def set_buy_df_for_auto(df_buy, kubun='現物'):
     df_buy['取引方法'] = '新規'
     df_buy['取引区分'] = kubun + '買い'
     df_buy['信用取引区分'] = ''
-    df_buy['注文条件１'] = '通常'
 
-    if df_buy['buy_limit_price'].all() == 0:
-        df_buy['注文条件２'] = '成行'
-        df_buy['指値'] = ''
-    else:
+    if df_buy['注文条件１'].all() == '':
+        df_buy['注文条件１'] = '通常'
+
+    if df_buy['buy_limit_price'].all() != 0:
         df_buy['注文条件２'] = '指値'
         df_buy['指値'] = df_buy['buy_limit_price']
 
-    df_buy['利確'] = ''
-    df_buy['損切'] = ''
     df_buy['注文日'] = ''
     df_buy['約定日'] = ''
     df_buy = df_buy.sort_values(by=['シグナル日'])
@@ -535,7 +587,6 @@ def trade(code, start_date, end_date, buy_pattern, sell_pattern, minimum_buy_thr
     # DBから株価取得
     sqlmgr = SqlliteMgr()
     df = sqlmgr.get_code_price(code, start_date, end_date)
-    # print(df)
 
     # 買い条件列追加
     df['5MA'] = df['close'].rolling(window=5).mean()
@@ -550,6 +601,11 @@ def trade(code, start_date, end_date, buy_pattern, sell_pattern, minimum_buy_thr
     df['open_close_1diff'] = df['open'].shift(-1).fillna(0) - df['close']  # 翌日始値-当日終値
     df['high_shift_1'] = df['high'].shift(-1).fillna(0)  # 翌日高値
     df['buy_limit_price'] = 0  # 買いの指値の値
+    df['注文条件１'] = ''  # 買いの注文条件１の値
+    df['注文条件２'] = ''  # 買いの注文条件２の値
+    df['指値'] = ''  # 買いの指値の値
+    df['利確'] = ''  # 買いの利確の値
+    df['損切'] = ''  # 買いの損切の値
 
     # pattern関数の条件にマッチしたレコードだけ抽出（購入）
     if buy_pattern == 1:
@@ -580,8 +636,14 @@ def trade(code, start_date, end_date, buy_pattern, sell_pattern, minimum_buy_thr
 
         # print(df_profit)
         print(f"code: {code} 利益: {round(df_profit['利益'].sum())}\n")
-
         df_profit['code'] = code
+
+        # df_buy追加修正
+        if buy_pattern in [1, 2, 2_1, 3]:
+            df_buy = edit_df_buy_pattern2(df_buy, df_sell)
+        if sell_pattern in [1_1]:
+            df_buy = edit_df_sell_pattern1_1(df_buy, df_sell)
+
         return df_profit, df_sell, df_buy
     else:
         print(f'\ncode: {code} 売買条件に当てはまるレコードなし\n')
@@ -683,9 +745,11 @@ if __name__ == '__main__':
         _ = calc_stock_index(df_profits, profit_col='利益', deposit=args['deposit'])
 
         # 自動売買用csvの列作成
+        # print(df_buys.columns)
         df_buy_for_auto = set_buy_df_for_auto(df_buys, kubun=args['kubun'])
-        df_sell_for_auto = set_sell_df_for_auto(df_sells, kubun=args['kubun'])
-        df_for_autos = pd.concat([df_buy_for_auto, df_sell_for_auto], ignore_index=True)
+        # df_sell_for_auto = set_sell_df_for_auto(df_sells, kubun=args['kubun'])
+        # df_for_autos = pd.concat([df_buy_for_auto, df_sell_for_auto], ignore_index=True)
+        df_for_autos = df_buy_for_auto.reset_index(drop=True)
 
         # 自動売買用csv出力
         df_for_autos = df_for_autos.dropna(subset=['シグナル日'])

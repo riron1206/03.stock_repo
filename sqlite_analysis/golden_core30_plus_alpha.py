@@ -45,8 +45,8 @@ def pattern2(row):
         and row['close'] >= row['high_shfi1_10MAX'] \
         and row['volume_1diff_rate'] >= 0.3 \
         and row['close'] >= ((row['high'] - row['low']) * 0.7) + row['low'] \
-        and (row['close'] - row['25MA']) / row['25MA'] < 0.05 \
-        and row['open_close_1diff'] > 0:
+        and (row['close'] - row['25MA']) / row['25MA'] < 0.05:
+        #and row['open_close_1diff'] > 0:
         # return row
         return 1
     else:
@@ -233,6 +233,7 @@ if __name__ == '__main__':
                                                    code_list,
                                                    deposit,
                                                    order_under_limit)
+    result.to_csv(r'output\golden_core30_plus_alpha.csv')
     print()
     print('現在の預り金:', portfolio.deposit)
     print('投資総額:', portfolio.amount_of_investment)
