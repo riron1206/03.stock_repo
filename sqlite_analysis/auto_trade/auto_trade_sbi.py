@@ -18,7 +18,7 @@ today = datetime.datetime.today()
 password_dir = 'password'
 input_dir = 'input'
 
-csv = os.path.join(input_dir, "auto_order.csv")  # 本番用
+csv = os.path.join(input_dir, "order.csv")  # 本番用
 # csv = r'input\test_order.csv'  # テスト用
 
 df = pd.read_csv(csv, encoding="shift_jis")

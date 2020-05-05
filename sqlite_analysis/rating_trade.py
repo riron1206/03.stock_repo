@@ -143,6 +143,7 @@ def simulate_rating_trade(db_file_name, start_date, end_date, deposit, reserve,
                     sim.SellMarketOrder(code, stock.current_count))
 
         # 月の入金額以上持っていたら新しい株を物色
+        # print('code, date:', code, date)
         if portfolio.deposit >= reserve:
             r = get_prospective_brand(date)
             if r:

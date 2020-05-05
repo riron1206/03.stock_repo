@@ -1,7 +1,11 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-my Slackに結果メッセージを飛ばす
+自分のSlackに結果メッセージを飛ばす
+参考:
+https://vaaaaaanquish.hatenablog.com/entry/2017/09/27/154210
+https://qiita.com/ik-fib/items/b4a502d173a22b3947a0
+
 Usage:
     $ python post_my_slack.py
 """
@@ -26,7 +30,7 @@ def post_slack(name, text):
              "icon_emoji": ":python:"}))
 
 
-df = pd.read_csv(r'input\auto_order.csv', encoding='shift-jis')
+df = pd.read_csv(r'input\order.csv', encoding='shift-jis')
 
 date = df['シグナル日'][0]
 codes = df['証券コード'].to_list()

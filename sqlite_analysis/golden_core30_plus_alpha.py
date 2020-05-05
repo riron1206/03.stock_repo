@@ -45,8 +45,8 @@ def pattern2(row):
         and row['close'] >= row['high_shfi1_10MAX'] \
         and row['volume_1diff_rate'] >= 0.3 \
         and row['close'] >= ((row['high'] - row['low']) * 0.7) + row['low'] \
-        and (row['close'] - row['25MA']) / row['25MA'] < 0.05:
-        #and row['open_close_1diff'] > 0:
+        and (row['close'] - row['25MA']) / row['25MA'] < 0.05 \
+        and row['open_close_1diff'] > 0:
         # return row
         return 1
     else:
@@ -72,23 +72,23 @@ def create_stock_data(db_file_name, code_list, start_date, end_date):
                              parse_dates=('date',),
                              index_col='date')
         # print(prices)
+        if prices.empty == False:
+            # ### plu_alpha #### #
+            prices['5MA'] = prices['close'].rolling(window=5).mean()
+            prices['25MA'] = prices['close'].rolling(window=25).mean()
+            prices['close_10MAX'] = prices['close'].rolling(window=10, min_periods=0).max()  # 直近10日間の中で最大終値
+            prices['high_10MAX'] = prices['high'].rolling(window=10, min_periods=0).max()  # 直近10日間の中で最大高値
+            prices['high_shfi1_10MAX'] = prices['high'].shift(1).fillna(0).rolling(window=10, min_periods=0).max()  # 前日からの直近10日間の中で最大高値
+            prices['volume_1diff_rate'] = (prices['volume'] - prices['volume'].shift(1).fillna(0)) / prices['volume'].shift(1).fillna(0)  # 前日比出来高
+            prices['open_close_1diff'] = prices['open'].shift(-1).fillna(0) - prices['close']  # 翌日始値-当日終値
+            # 購入フラグ付ける
+            prices['buy_flag'] = prices.apply(pattern2, axis=1)
+            ######################
 
-        # ### plu_alpha #### #
-        prices['5MA'] = prices['close'].rolling(window=5).mean()
-        prices['25MA'] = prices['close'].rolling(window=25).mean()
-        prices['close_10MAX'] = prices['close'].rolling(window=10, min_periods=0).max()  # 直近10日間の中で最大終値
-        prices['high_10MAX'] = prices['high'].rolling(window=10, min_periods=0).max()  # 直近10日間の中で最大高値
-        prices['high_shfi1_10MAX'] = prices['high'].shift(1).fillna(0).rolling(window=10, min_periods=0).max()  # 前日からの直近10日間の中で最大高値
-        prices['volume_1diff_rate'] = (prices['volume'] - prices['volume'].shift(1).fillna(0)) / prices['volume'].shift(1).fillna(0)  # 前日比出来高
-        prices['open_close_1diff'] = prices['open'].shift(-1).fillna(0) - prices['close']  # 翌日始値-当日終値
-        # 購入フラグ付ける
-        prices['buy_flag'] = prices.apply(pattern2, axis=1)
-        ######################
-
-        # 株価が欠損のレコードもあるので
-        #  method='ffill'を使って、欠損している個所にもっとも近い個所にある有効なデーターで埋める
-        stocks[code] = {'unit': unit,
-                        'prices': prices.reindex(tse_index, method='ffill')}
+            # 株価が欠損のレコードもあるので
+            #  method='ffill'を使って、欠損している個所にもっとも近い個所にある有効なデーターで埋める
+            stocks[code] = {'unit': unit,
+                            'prices': prices.reindex(tse_index, method='ffill')}
     return stocks
 
 
@@ -131,7 +131,8 @@ def simulate_golden_dead_cross(db_file_name,
     　 order_order_under_limit: ゴールデンクロス時の最小購入金額
     """
     # 指定した銘柄(code_list)それぞれの単元株数と日足(始値・終値）を含む辞書を作成
-    stocks = create_stock_data(db_file_name, code_list, start_date, end_date)
+    _start_date = start_date - datetime.timedelta(days=500)  # 200日移動平均線の計算があるから500日前からスタート
+    stocks = create_stock_data(db_file_name, code_list, _start_date, end_date)
 
     # {ゴールデンクロス・デッドクロスが発生した日 : 発生した銘柄のリスト}の辞書を作成
     # defaultdict の引数は「関数」です。関数を書けば、いかなる初期化でも可能

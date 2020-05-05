@@ -4,7 +4,9 @@
 自動売買で使うcsvを作成
 Usage:
     $ activate stock
-    $ python ./make_order_csv.py -all  # 最近のデータだけで全銘柄実行
+    $ python make_order_csv.py -all  # 最近のデータだけで全銘柄実行（自分用）
+    $ python make_order_csv.py -is_csv -cd <csvファイルのフォルダ> -cs 2917 7974 # csvファイルからデータロードして実行する場合
+    $ python make_order_csv.py -is_history -sd 20100101 -ed 20200101 -cs 2917 7974
 """
 import argparse
 import datetime
@@ -46,6 +48,16 @@ class SqlliteMgr():
         """
         # print(sql)
         return self.table_to_df(sql=sql)
+
+
+def load_stock_csv(code, csv_path, start_date, end_date):
+    df = pd.read_csv(csv_path, encoding='shift-jis',
+                     dtype={1: float, 2: float, 3: float, 4: float, 5: float, 6: float},
+                     parse_dates=[0])
+    df = df[(df['日付'] >= start_date) & (df['日付'] <= end_date)]
+    df = df.rename(columns={'日付': 'date', '始値': 'open', '高値': 'high', '安値': 'low', '終値': 'close', '出来高': 'volume'})
+    df['code'] = code
+    return df.reset_index(drop=True)
 
 
 def buy_pattern2(row):
@@ -170,11 +182,25 @@ def set_buy_df_for_auto2(df_buy, minimum_buy_threshold, under_unit, kubun='現�
     return df_buy
 
 
-def calc_code_order(code, start_date, end_date, pattern, minimum_buy_threshold, under_unit):
-    """ 1銘柄について、注文日と利確損切ラインを見つける """
-    # DBから株価取得
-    sqlmgr = SqlliteMgr()
-    df = sqlmgr.get_code_price(code, start_date, end_date)
+def calc_order_flag(code, start_date, end_date, pattern, minimum_buy_threshold, under_unit, csv_path=None):
+    """
+    1銘柄について、注文日と利確損切ラインを見つける
+    Args:
+        code: 銘柄コード
+        start_date: : データ取得する期間。ここまでの期間取得する
+        end_date: データ取得する期間。20201201なら2020/12/1までの株価取得する
+        pattern: 購入方法の関数番号
+        minimum_buy_threshold: 予算。30000なら指定株を30000円以上買うことにする
+        under_unit: 最低購入単位。100なら100株単位で購入する
+        csv_path: 株価csv。株価をcsvからデータロードする場合指定する
+    """
+    if csv_path is not None:
+        # csvファイルの指定があれば優先する
+        df = load_stock_csv(code, csv_path, start_date, end_date)
+    else:
+        # DBから株価取得
+        sqlmgr = SqlliteMgr()
+        df = sqlmgr.get_code_price(code, start_date, end_date)
 
     # 買い条件列追加
     df['5MA'] = df['close'].rolling(window=5).mean()
@@ -212,14 +238,17 @@ def calc_code_order(code, start_date, end_date, pattern, minimum_buy_threshold, 
 def get_args():
     ap = argparse.ArgumentParser()
     ap.add_argument("-o", "--output_dir", type=str, default='input')
+    ap.add_argument("-cd", "--csv_dir", type=str, default=r'D:\DB_Browser_for_SQLite\csvs\kabuoji3')  # 株価csvの格納ディレクトリ
     ap.add_argument("-cs", "--codes", type=int, nargs='*', default=[2914])  # JT
     ap.add_argument("-sd", "--start_date", type=str, default=None)  # '2015-01-01'
-    ap.add_argument("-ed", "--end_date", type=str, default=None)
+    ap.add_argument("-ed", "--end_date", type=str, default=None)  # '2019-01-01'
     ap.add_argument("-p", "--pattern", type=int, default=2_1)
     ap.add_argument("-mbt", "--minimum_buy_threshold", type=int, default=300000)
     ap.add_argument("-uu", "--under_unit", type=int, default=100)
     ap.add_argument("-k", "--kubun", type=str, default='現物')
     ap.add_argument("-all", "--is_all_codes", action='store_const', const=True, default=False, help="all stock flag.")
+    ap.add_argument("-is_csv", "--is_csv_load", action='store_const', const=True, default=False, help="load stock csv path flag.")
+    ap.add_argument("-is_history", "--is_leave_history", action='store_const', const=True, default=False, help="leave all date record flag.")
     return vars(ap.parse_args())
 
 
@@ -232,7 +261,7 @@ if __name__ == '__main__':
     # code = 6758  # Sony
     codes = args['codes']
     if args['is_all_codes']:
-        codes = [int(pathlib.Path(p).stem) for p in glob.glob(r'D:\DB_Browser_for_SQLite\csvs\kabuoji3\*.csv')]
+        codes = [int(pathlib.Path(p).stem) for p in glob.glob(os.path.join(args['csv_dir'], '*.csv'))]
 
     output_dir = args['output_dir']
     os.makedirs(output_dir, exist_ok=True)
@@ -251,7 +280,14 @@ if __name__ == '__main__':
     pbar = tqdm(codes)
     for code in pbar:
         pbar.set_description(str(code))
-        df_buy = calc_code_order(code, start_date, end_date, args['pattern'], args['minimum_buy_threshold'], args['under_unit'])
+
+        csv_path = None
+        if args['is_csv_load']:
+            csv_path = os.path.join(args['csv_dir'], str(code) + '.csv')  # csvファイルからデータロードする場合
+
+        df_buy = calc_order_flag(code, start_date, end_date,
+                                 args['pattern'], args['minimum_buy_threshold'], args['under_unit'],
+                                 csv_path)  # 買いシグナル計算
         if df_buy is not None:
             if df_buys is None:
                 df_buys = df_buy
@@ -269,9 +305,12 @@ if __name__ == '__main__':
                            '注文数', '注文条件１', '注文条件２', '指値', '利確', '損切', '注文日', '約定日',
                            'close', 'volume', 'minimum_buy_threshold']]
 
-        df_buys['シグナル日'] = pd.to_datetime(df_buys['シグナル日'])
-        run_day = df_buys['シグナル日'].iloc[-1]  # 最後の日だけ残す
-        df_buys = df_buys[df_buys['シグナル日'] >= run_day]
+        if args['is_leave_history']:
+            pass
+        else:
+            df_buys['シグナル日'] = pd.to_datetime(df_buys['シグナル日'])
+            run_day = df_buys['シグナル日'].iloc[-1]  # 最後の日だけ残す
+            df_buys = df_buys[df_buys['シグナル日'] >= run_day]
 
         df_buys = df_buys.sort_values(by=['volume'], ascending=False)  # 出来高でかい順にしておく
-        df_buys.to_csv(os.path.join(output_dir, 'auto_order.csv'), index=False, encoding='shift-jis')
+        df_buys.to_csv(os.path.join(output_dir, 'order.csv'), index=False, encoding='shift-jis')

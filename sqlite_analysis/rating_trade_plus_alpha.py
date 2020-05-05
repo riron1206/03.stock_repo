@@ -39,18 +39,18 @@ def buy_pattern2(row):
     買い条件:
     - 当日終値が5MA,25MAより上
     - 当日終値が前日からの直近10日間の最大高値より上
-    - 当日出来高が前日比30%以上増
+    - 当日出来高が前日比50%以上増
     - 当日終値が当日の値幅の上位70%以上(大陽線?)
     - 当日終値が25MA乖離率+5％未満
-
+    - 翌日始値が前日終値より10円高い
     """
     if row['close'] >= row['5MA'] \
         and row['close'] >= row['25MA'] \
         and row['close'] >= row['high_shfi1_10MAX'] \
-        and row['volume_1diff_rate'] >= 0.3 \
+        and row['volume_1diff_rate'] >= 0.5 \
         and row['close'] >= ((row['high'] - row['low']) * 0.7) + row['low'] \
-        and (row['close'] - row['25MA']) / row['25MA'] < 0.05:
-        # - 当日高値＋１で逆指値
+        and (row['close'] - row['25MA']) / row['25MA'] < 0.05 \
+        and row['open_close_1diff'] > 10:
         # return row
         return 1
     else:
@@ -70,28 +70,31 @@ def is_judge_stock_code(db_file_name, code, start_date, end_date):
                          params=(code, start_date, end_date),
                          parse_dates=('date',),
                          index_col='date')
-    # ### plu_alpha #### #
-    prices['5MA'] = prices['close'].rolling(window=5).mean()
-    prices['25MA'] = prices['close'].rolling(window=25).mean()
-    prices['75MA'] = prices['close'].rolling(window=75).mean()
-    prices['200MA'] = prices['close'].rolling(window=200).mean()
-    prices['close_10MAX'] = prices['close'].rolling(window=10, min_periods=0).max()  # 直近10日間の中で最大終値
-    prices['high_10MAX'] = prices['high'].rolling(window=10, min_periods=0).max()  # 直近10日間の中で最大高値
-    prices['high_shfi1_10MAX'] = prices['high'].shift(1).fillna(0).rolling(window=10, min_periods=0).max()  # 前日からの直近10日間の中で最大高値
-    prices['volume_1diff_rate'] = (prices['volume'] - prices['volume'].shift(1).fillna(0)) / prices['volume'].shift(1).fillna(0)  # 前日比出来高
-    prices['open_close_1diff'] = prices['open'].shift(-1).fillna(0) - prices['close']  # 翌日始値-当日終値
-    # 購入フラグ付ける
-    prices['buy_flag'] = prices.apply(buy_pattern2, axis=1)
-    ######################
-    prices = prices.dropna(how='any')
+    if prices.empty == False:
+        # ### plu_alpha #### #
+        prices['5MA'] = prices['close'].rolling(window=5).mean()
+        prices['25MA'] = prices['close'].rolling(window=25).mean()
+        prices['75MA'] = prices['close'].rolling(window=75).mean()
+        prices['200MA'] = prices['close'].rolling(window=200).mean()
+        prices['close_10MAX'] = prices['close'].rolling(window=10, min_periods=0).max()  # 直近10日間の中で最大終値
+        prices['high_10MAX'] = prices['high'].rolling(window=10, min_periods=0).max()  # 直近10日間の中で最大高値
+        prices['high_shfi1_10MAX'] = prices['high'].shift(1).fillna(0).rolling(window=10, min_periods=0).max()  # 前日からの直近10日間の中で最大高値
+        prices['volume_1diff_rate'] = (prices['volume'] - prices['volume'].shift(1).fillna(0)) / prices['volume'].shift(1).fillna(0)  # 前日比出来高
+        prices['open_close_1diff'] = prices['open'].shift(-1).fillna(0) - prices['close']  # 翌日始値-当日終値
+        # 購入フラグ付ける
+        prices['buy_flag'] = prices.apply(buy_pattern2, axis=1)
+        ######################
+        prices = prices.dropna(how='any')
 
-    # 条件に当てはまるレコード無ければ、行もしくは列がない
-    if prices.shape[0] == 0 or prices.shape[1] == 0:
-        return False
-    buy_flag_date = [x.strftime("%Y-%m-%d") for x in prices.index.tolist()][-1]
-    # print(code, buy_flag_date)
-    if end_date == buy_flag_date:
-        return True
+        # 条件に当てはまるレコード無ければ、行もしくは列がない
+        if prices.empty:
+            return False
+        print(prices)
+        buy_flag_date = [x.strftime("%Y-%m-%d") for x in prices.index.tolist()][-1]
+        # print(code, buy_flag_date)
+        if end_date == buy_flag_date:
+            return True
+    return False
 
 
 def simulate_rating_trade(db_file_name, start_date, end_date, deposit, reserve,
@@ -126,7 +129,7 @@ def simulate_rating_trade(db_file_name, start_date, end_date, deposit, reserve,
         　最後に発表された目標株価を利用する）」
         を見つけ出して、その銘柄の銘柄コードと単元株数を返す
         """
-        prev_month_day = date - relativedelta(months=1)
+        prev_month_day = date - relativedelta(months=months)
         # <SQL解説>
         # WITH句の last_date_t で銘柄コードと証券会社ごとに、1か月前から物色日までの間で最後に目標株価を公開した日を求める
         # ↓
@@ -210,6 +213,12 @@ def simulate_rating_trade(db_file_name, start_date, end_date, deposit, reserve,
                     code, unit, _ = r
                     # order_list.append(sim.BuyMarketOrderAsPossible(code, unit))
 
+                    # print(type(start_date), type(date))
+                    # レーティングよくてチャートもいいのは基本無い
+                    _start_date = date - datetime.timedelta(days=500)  # 200日移動平均線の計算があるから500日前からスタート
+                    print('code, start_date, date:', code, start_date, date,
+                                                     is_judge_stock_code(db_file_name, code, _start_date, date))
+
                     # 追加の株価購入条件もつける
                     if is_judge_stock_code(db_file_name, code, start_date, date):
                         # 購入最低金額以上持っていたら新しい株購入
@@ -228,7 +237,7 @@ def get_args():
     ap = argparse.ArgumentParser()
     ap.add_argument("-db", "--db_file_name", type=str, default=r'D:\DB_Browser_for_SQLite\stock.db',
                     help="sqlite db file path.")
-    ap.add_argument("-sd", "--start_date", type=str, default='20100401',
+    ap.add_argument("-sd", "--start_date", type=str, default='20150401',
                     help="start day (yyyymmdd).")
     ap.add_argument("-ed", "--end_date", type=str, default='20200401',
                     help="end day (yyyymmdd).")
