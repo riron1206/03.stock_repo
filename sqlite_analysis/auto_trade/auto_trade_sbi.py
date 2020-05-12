@@ -61,7 +61,8 @@ for order_list in tqdm(order_lists):
         if order_list[3] == "新規":  # 新規注文（現物買い・現物売り・信用買い・信用売り）
             # 銘柄コード
             driver.find_element_by_name("stock_sec_code").clear()
-            driver.find_element_by_name("stock_sec_code").send_keys(str(order_list[2]))
+            # driver.find_element_by_name("stock_sec_code").send_keys(str(order_list[2]))
+            driver.find_element_by_name("stock_sec_code").send_keys(int(order_list[2]))
 
             # 取引売買条件を設定
             if order_list[4] == "現物買い":
@@ -88,7 +89,7 @@ for order_list in tqdm(order_lists):
             # 「注文受付」の表示で注文結果を確認する（「注文入力」なら失敗とする）
             if soup.find("h2", text=("注文入力")):
                 print("{}の検索に失敗している可能性があります".format(order_list[2]))
-                print(soup.find("p",class_="bold").text)
+                print(soup.find("p", class_="bold").text)
             else:
                 ################################ここから注文画面################################
                 # 注文条件１（OCO、IFDは省略）
@@ -216,7 +217,7 @@ for order_list in tqdm(order_lists):
 
                 else:
                     print("{}の注文に失敗している可能性があります".format(order_list[2]))
-                    print(soup.find("p",class_="bold").text)
+                    print(soup.find("p", class_="bold").text)
                     ANS = "1"
                     traceback.print_exc()
 

@@ -60,7 +60,7 @@ def load_stock_csv(code, csv_path, start_date, end_date):
     return df.reset_index(drop=True)
 
 
-def buy_pattern2(row):
+def buy_pattern2_old(row):
     """
     買い条件:
     - 当日終値が5MA,25MAより上
@@ -72,6 +72,29 @@ def buy_pattern2(row):
     if row['close'] >= row['5MA'] \
         and row['close'] >= row['25MA'] \
         and row['close'] >= row['high_shfi1_10MAX'] \
+        and row['volume_1diff_rate'] >= 0.3 \
+        and row['close'] >= ((row['high'] - row['low']) * 0.7) + row['low'] \
+        and (row['close'] - row['25MA']) / row['25MA'] < 0.05:
+        return row
+    else:
+        return pd.Series()
+
+
+def buy_pattern2(row):
+    """
+    買い条件:
+    - 当日終値が5MA,25MA,200MAより上
+    - 当日終値が前日からの直近10日間の最大高値より上
+    - 当日出来高が3万以上
+    - 当日出来高が前日比30%以上増
+    - 当日終値が当日の値幅の上位70%以上(大陽線?)
+    - 当日終値が25MA乖離率+5％未満
+    """
+    if row['close'] >= row['5MA'] \
+        and row['close'] >= row['25MA'] \
+        and row['close'] >= row['200MA'] \
+        and row['close'] >= row['high_shfi1_10MAX'] \
+        and row['volume'] >= 30000 \
         and row['volume_1diff_rate'] >= 0.3 \
         and row['close'] >= ((row['high'] - row['low']) * 0.7) + row['low'] \
         and (row['close'] - row['25MA']) / row['25MA'] < 0.05:
@@ -243,7 +266,7 @@ def get_args():
     ap.add_argument("-sd", "--start_date", type=str, default=None)  # '2015-01-01'
     ap.add_argument("-ed", "--end_date", type=str, default=None)  # '2019-01-01'
     ap.add_argument("-p", "--pattern", type=int, default=2_1)
-    ap.add_argument("-mbt", "--minimum_buy_threshold", type=int, default=300000)
+    ap.add_argument("-mbt", "--minimum_buy_threshold", type=int, default=500000)
     ap.add_argument("-uu", "--under_unit", type=int, default=100)
     ap.add_argument("-k", "--kubun", type=str, default='現物')
     ap.add_argument("-all", "--is_all_codes", action='store_const', const=True, default=False, help="all stock flag.")
