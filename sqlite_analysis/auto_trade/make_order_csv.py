@@ -14,9 +14,12 @@ import glob
 import os
 import sqlite3
 import pathlib
+import warnings
+
 import pandas as pd
 from tqdm import tqdm
-import warnings
+from joblib import Parallel, delayed
+
 warnings.filterwarnings("ignore")
 
 
@@ -138,33 +141,21 @@ def sell_pattern2(df, df_buy):
 
         # 購入シグナルの出た前日or当日の安値の-5円をIFDOCO-成行の損切とする（損切）
         stop_loss2 = df.loc[ind]['low'] - 5
-        if ind != 0:
-            stop_loss1 = df.loc[ind - 1]['low'] - 5
-        else:
-            stop_loss1 = stop_loss2
-        if stop_loss1 < stop_loss2:
-            ifdoco_stop_loss = stop_loss2
-        else:
-            ifdoco_stop_loss = stop_loss1
+        stop_loss1 = df.loc[ind - 1]['low'] - 5 if ind != 0 else stop_loss2
+        ifdoco_stop_loss = stop_loss2 if stop_loss1 < stop_loss2 else stop_loss1
 
         # シグナル当日終値の上にある75MA、200MAの大きい方を通常-指値とする(利確)
         if (df.loc[ind]['close'] <= df.iloc[ind]['75MA']) \
             or (df.loc[ind]['close'] <= df.iloc[ind]['200MA']):
 
-            if df.iloc[ind]['75MA'] > df.iloc[ind]['200MA']:
-                limit_price = df.iloc[ind]['75MA']
-            else:
-                limit_price = df.iloc[ind]['200MA']
+            limit_price = df.iloc[ind]['75MA'] if df.iloc[ind]['75MA'] > df.iloc[ind]['200MA'] else df.iloc[ind]['200MA']
 
             if ifdoco_set_profit < limit_price:
                 ifdoco_set_profit = limit_price
 
         # シグナル当日の終値の下にある5MAを通常-逆指値とする（損切）
-        if df.iloc[ind]['5MA'] < df.iloc[ind]['close']:
-            stop_loss = df.iloc[ind]['5MA']
-
-            if ifdoco_stop_loss < stop_loss:
-                ifdoco_stop_loss = stop_loss
+        if ifdoco_stop_loss < df.iloc[ind]['5MA'] < df.iloc[ind]['close']:
+            ifdoco_stop_loss = df.iloc[ind]['5MA']
 
         ifdoco_set_profits.append(ifdoco_set_profit)
         ifdoco_stop_losses.append(ifdoco_stop_loss)
@@ -222,8 +213,7 @@ def calc_order_flag(code, start_date, end_date, pattern, minimum_buy_threshold, 
         df = load_stock_csv(code, csv_path, start_date, end_date)
     else:
         # DBから株価取得
-        sqlmgr = SqlliteMgr()
-        df = sqlmgr.get_code_price(code, start_date, end_date)
+        df = SqlliteMgr().get_code_price(code, start_date, end_date)
 
     # 買い条件列追加
     df['5MA'] = df['close'].rolling(window=5).mean()
@@ -312,10 +302,7 @@ if __name__ == '__main__':
                                  args['pattern'], args['minimum_buy_threshold'], args['under_unit'],
                                  csv_path)  # 買いシグナル計算
         if df_buy is not None:
-            if df_buys is None:
-                df_buys = df_buy
-            else:
-                df_buys = pd.concat([df_buys, df_buy], ignore_index=True)
+            df_buys = df_buy if df_buys is None else pd.concat([df_buys, df_buy], ignore_index=True)
 
     if df_buys is not None:
         df_buys['minimum_buy_threshold'] = args['minimum_buy_threshold']  # 予算も列に入れとく
