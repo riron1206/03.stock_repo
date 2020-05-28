@@ -81,6 +81,10 @@ def add_option_columns(df, start_date):
     df['open_rate'] = (abs(df['open'] - df['low']) / abs(df['high'] - df['low']))  # 始値-安値の絶対値/高値-安値の絶対値
     df['close_rate'] = (abs(df['close'] - df['low']) / abs(df['high'] - df['low']))  # 終値-安値の絶対値/高値-安値の絶対値
 
+    # 割り算だからnanになる可能性あるので0で置換
+    df['open_rate'] = df['open_rate'].fillna(0)
+    df['close_rate'] = df['close_rate'].fillna(0)
+
     # start_dateからのレコードだけにする（200MA出すためにstart_date より前のレコード保持しているため）
     df = df.dropna(subset=['200MA'])
     df['date_datetime'] = pd.to_datetime(df['date'])

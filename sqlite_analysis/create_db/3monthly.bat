@@ -14,7 +14,7 @@ call python no_030_get_new_delete_brands_info.py -db %MY_DB%
 echo %date% %time% no_030_get_new_delete_brands_info.py end. >> log.txt
 
 @rem 全テーブル更新する場合はdaily.bat呼び出す
-@rem call daily.bat
+call daily.bat
 
 @rem 営業利益を含む四半期ごとの決算情報スクレイピング + テーブルに情報追加。-uで最新レコードのみ追加する
 @rem これは3か月ごとの実行でいい
