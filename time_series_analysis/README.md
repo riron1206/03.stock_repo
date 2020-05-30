@@ -1,7 +1,7 @@
-# sarimax_analysis
-時系列データ(ts:time_series)に対して、SARIMAモデル(Seasonal ARIMA model：周期的な季節変動の効果を追加したARIMAモデル)作成
+# time_series_analysis
+時系列データ(ts:time_series)に対して、AR/ARMA/ARIMA/SARIMAモデル(Seasonal ARIMA model：周期的な季節変動の効果を追加したARIMAモデル)作成
 - データによって周期性や階差分違うから、モデル作成についてはnotebookで自己相関plotを確認しながら実行した方がよさそう
-- 参考: test_sarimax_analysis.py.ipynb
+- 参考: test_sarimax_model.py.ipynb, test_AR_ARMA_ARIMA_SARIMA.ipynb
 
 ## Usage
 ```bash

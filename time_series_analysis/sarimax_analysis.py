@@ -162,9 +162,134 @@ def make_lbtest_df(resid, lags=10):
     return lbtest_df
 
 
+def make_ar_model(ar_data: np.ndarray):
+    """
+    ARモデル生成
+    ※ARモデル:1つ前のデータ+定常性もつノイズで次の値を決めるモデル
+    　1次のARモデルは x(t) = c + Φ*x(t-1) + ε(t)
+      ε(t)がホワイトノイズで正規乱数
+    Usage:
+        test_func()のtest_make_ar_arma_arima_model()参照
+    """
+    # モデルの生成
+    model = sm.tsa.AR(ar_data)
+    # AICでモデルの次数を選択
+    best_lag = model.select_order(maxlag=6, ic='aic')
+    print('推定したARモデルの次数:', best_lag)
+    # 決定した次数でパラメータ推定
+    model_fit = model.fit(maxlag=best_lag)
+    # モデルが推定したパラメーター
+    print('定数項c, 自己回帰係数Φ1,Φ2,… :', model_fit.params)
+    print('ホワイトノイズの分散:', model_fit.sigma2)
+    return model_fit
+
+
+def make_arma_model(arma_data: np.ndarray):
+    """
+    ARMAモデル生成
+    ※ARMAモデル:ARモデル+MAモデル
+    　1次のARモデルは x(t) = c + Φ*x(t-1) + ε(t) + θ*ε(t-1)
+    ※MAモデル:1つ前のホワイトノイズで次の値を決めるモデル
+    　1次のMAモデルは x(t) = c + θ*ε(t-1) + ε(t)
+    Usage:
+        test_func()のtest_make_ar_arma_arima_model()参照
+    """
+    # AICでモデルの次数を選択
+    best_order = sm.tsa.arma_order_select_ic(arma_data,
+                                             ic='aic',
+                                             trend='nc')['aic_min_order']
+    print('推定したARMAモデルの次数:', best_order)
+    # モデルの生成
+    model = sm.tsa.ARMA(arma_data,
+                        order=[best_order[0], best_order[1]])
+    # 決定した次数でパラメータ推定
+    model_fit = model.fit(maxlag=max(best_order))
+    # モデルが推定したパラメーター
+    print('定数項c, 自己回帰係数Φ1,Φ2,… . 移動平均係数θ1,θ2,…:', model_fit.params)
+    print('ホワイトノイズの分散:', model_fit.sigma2)
+    # train setの正解と予測のplot
+    fig = plt.figure(figsize=(10, 5))
+    ax = fig.add_subplot(1, 1, 1)
+    model_fit.plot_predict(ax=ax)
+    plt.title('train set')
+    plt.plot()
+    return model_fit
+
+
+def make_arima_model(arima_data: np.ndarray, param_d=1):
+    """
+    ARIMAモデル生成
+    ※ARIMAモデル:データの差分を取ってからARMAを適用したモデル
+    Usage:
+        test_func()のtest_make_ar_arma_arima_model()参照
+    """
+    # AICでモデルの次数を選択
+    best_order = sm.tsa.arma_order_select_ic(arima_data,
+                                             ic='aic',
+                                             trend='nc')['aic_min_order']
+    print('推定したARMAモデルの次数:', best_order)
+    # モデルの生成
+    # (p,d,q)のパラメータによってはエラーになるのでtryで囲む
+    try:
+        model = sm.tsa.ARIMA(arima_data,
+                             order=[best_order[0], param_d, best_order[1]])
+    except:
+        traceback.print_exc()
+        pass
+    # 決定した次数でパラメータ推定
+    model_fit = model.fit(maxlag=max(best_order))
+    # モデルが推定したパラメーター
+    print('定数項c, 自己回帰係数Φ1,Φ2,… . 移動平均係数θ1,θ2,…:', model_fit.params)
+    print('ホワイトノイズの分散:', model_fit.sigma2)
+    # train setの正解と予測のplot
+    fig = plt.figure(figsize=(10, 8))
+    ax = fig.add_subplot(1, 1, 1)
+    model_fit.plot_predict(ax=ax)
+    plt.title('train set')
+    plt.plot()
+    return model_fit
+
+
+def make_sarimax_model(sarimax_data: np.ndarray, param_d=1, param_P=0, param_D=0, param_Q=0, param_s=12):
+    """
+    SARIMAモデル生成
+    ※SARIMAモデル:季節変動のパラメータdを追加したARIMAモデル
+    Usage:
+        test_func()のtest_make_ar_arma_arima_model()参照
+    """
+    # AICでモデルの次数を選択
+    best_order = sm.tsa.arma_order_select_ic(sarimax_data,
+                                             ic='aic',
+                                             trend='nc')['aic_min_order']
+    print('推定したARMAモデルの次数:', best_order)
+    # モデルの生成
+    # (p,d,q)のパラメータによってはエラーになるのでtryで囲む
+    try:
+        model = sm.tsa.SARIMAX(sarimax_data,
+                               order=(best_order[0], param_d, best_order[1]),  # order=(p, d, q)。pはAR（自己回帰）、qはMA（移動平均）、dが差分の次数
+                               seasonal_order=(param_P, param_D, param_Q, param_s),  # seasonal_order=(P, D, Q, s)。 順番はP,D,Q,sで前半の3つorderと一緒、最後4つ目は周期。季節調整に適用する各々の次数を指定
+                               enforce_stationarity=False,  # 定常性強制
+                               enforce_invertibility=False  # 可逆性強制
+                               )
+    except:
+        traceback.print_exc()
+        pass
+    # 決定した次数でパラメータ推定
+    model_fit = model.fit(maxlag=max(best_order))
+    # モデルが推定したパラメーター
+    print('定数項c, 自己回帰係数Φ1,Φ2,… . 移動平均係数θ1,θ2,…:', model_fit.params)
+    # 結果サマリーのplot
+    fig = plt.figure(figsize=(10, 7))
+    model_fit.plot_diagnostics(fig=fig)
+    plt.tight_layout()  # グラフ間スキマ調整
+    plt.plot()
+    return model_fit
+
+
 class SarimaxObjective(object):
     """
     SARIMAモデルのパラメータチューニング
+    ※SARIMAモデル:季節変動のパラメータdを追加したARIMAモデル
     Usage:
         run_optuna()参照
     """
@@ -265,15 +390,15 @@ def save_model_info(model, training_info: dict, preprocess_pipeline=None, output
     return save_data, filepath
 
 
-def predict_load_model(model_path: str, strat_date, end_date, ts=None, out_png=None):
+def predict_load_model(model_path: str, strat, end, ts=None, out_png=None):
     """
     作成したモデルファイルロードしてpredict。95%信頼区間のグラフplotも出す
-    strat_date, end_dateは'2020-05-12'みたいなdate形式以外に、123のような番号でも可能
+    strat_date, end_dateは'2020-05-12'みたいなdate形式以外に、123のようなindex番号でも可能
     """
     model_info = joblib.load(model_path)
 
     # 予測の数値だけでよいなら ts_pred = model_info['trained_model'].predict('1958-01-01', '1960-12-01') でいける
-    ts_pred_obj = model_info['trained_model'].get_prediction(strat_date, end_date)
+    ts_pred_obj = model_info['trained_model'].get_prediction(strat, end)
     ts_pred_ci = ts_pred_obj.conf_int(alpha=0.05)  # 信頼区間取得 defalut alpah=0.05 :returns a 95% confidence interval
 
     # グラフ表示
@@ -292,6 +417,79 @@ def predict_load_model(model_path: str, strat_date, end_date, ts=None, out_png=N
     plt.show()
 
     return ts_pred_obj.predicted_mean
+
+
+def test_func():
+    """
+    テスト駆動開発でのテスト関数
+    test用関数はpythonパッケージの nose で実行するのがおすすめ($ conda install -c conda-forge nose などでインストール必要)
+    →noseは再帰的にディレクトリ探索して「Test」や「test」で始まるクラスとメソッドを実行する
+    $ cd <このモジュールの場所>
+    $ nosetests -v -s sarimax_analysis.py  # 再帰的にディレクトリ探索して「Test」や「test」で始まるクラスとメソッドを実行。-s付けるとprint()の内容出してくれる
+    """
+    matplotlib.use('Agg')  # GUI使えない場合はこれつける
+
+    def test_make_ar_arma_arima_sarimax_model():
+        """make_ar_model(), make_arma_model(), make_arima_model() make_sarimax_model() テスト"""
+        def _get_sample_data():
+            # https://www.data.jma.go.jp/gmd/risk/obsdl/index.php から2001-2018年の東京の平均気温ダウンロードした
+            dateparse = lambda d: pd.datetime.strptime(d, '%Y/%m/%d')
+            df = pd.read_csv('kion18y.csv',
+                            skiprows=5,
+                            index_col=0,
+                            parse_dates=[0],
+                            date_parser=dateparse,
+                            dtype='float',
+                            encoding='shift-jis')
+            df = df.rename(columns={'Unnamed: 1': 'MT'})
+            ts = df['MT']
+
+            # train/test set分割
+            ratio = 0.998
+            # Seriesとして扱うとpredict難しくなるからnumpyにする
+            train = ts[: int(len(ts) * ratio)].values
+            test = ts[int(len(ts) * ratio):].values
+            # 時刻は別の変数で保持
+            # 今回の1日ごとのデータで日付をインデックスにすると、うまくモデルに適用できないので
+            str_index = ts.index
+            train_index = str_index[:int(len(ts) * ratio)].values
+            test_index = str_index[int(len(ts) * ratio):].values
+
+            return ts, train, test, train_index, test_index
+
+        def _plot_test(predict, test, test_index):
+            plt.figure(figsize=(10, 5))
+            plt.plot(test_index, test, marker='x', label='actual')
+            plt.plot(test_index, predict, marker='x', label='predict')
+            plt.title('test set')
+            plt.legend()
+            plt.show()
+
+        ts, train, test, train_index, test_index = _get_sample_data()
+
+        # make_ar_model()
+        model_fit = make_ar_model(train)
+        ar_predict = model_fit.predict(start=train.shape[0], end=ts.shape[0] - 1)
+        _plot_test(ar_predict, test, test_index)
+
+        # make_arma_model()
+        model_fit = make_arma_model(train)
+        print(model_fit.summary())
+        arma_predict = model_fit.predict(start=train.shape[0], end=ts.shape[0] - 1)
+        _plot_test(arma_predict, test, test_index)
+
+        # make_arima_model()
+        model_fit = make_arima_model(train, param_d=1)
+        print(model_fit.summary())
+        arima_predict = model_fit.predict(start=train.shape[0], end=ts.shape[0] - 1)
+        _plot_test(arima_predict, test, test_index)
+
+        # make_sarimax_model()
+        model_fit = make_sarimax_model(train, param_d=1)
+        print(model_fit.summary())
+        sarima_predict = model_fit.predict(start=train.shape[0], end=ts.shape[0] - 1)
+        _plot_test(sarima_predict, test, test_index)
+    test_make_ar_arma_arima_sarimax_model()
 
 
 def get_args():
