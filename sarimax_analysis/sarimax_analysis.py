@@ -111,7 +111,7 @@ def plot_seasonal_decompose(ts: pd.Series, c='r', out_png=None, freq=None):
 
 def plot_stationarity(ts: pd.Series, window_size=12, output_dir=None):
     """
-    定常性を確認するDickey-Fuller test 結果と標準偏差、平均のプロット
+    定常性を確認する Augmented Dickey-Fuller test(ADF検定) 結果と標準偏差、平均のプロット
     https://qiita.com/mshinoda88/items/749131478bfefc9bf365
     Usage:
         test_stationarity(ts, window_size=12)
