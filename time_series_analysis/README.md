@@ -6,8 +6,8 @@
 ## Usage
 ```bash
 $ activate tfgpu20
-$ python sarimax_analysis.py -i AirPassengers.csv -s 120 -n_t 30                                                   # train/test setを120行目で分け、パラメータチューニング30回実行し、モデル作成
-$ python sarimax_analysis.py -i AirPassengers.csv -s 120 -n_t 30 -fix_s 12                                         # 周期性sを固定してパラメータチューニングしてモデル作成
+$ python sarimax_analysis.py -i AirPassengers.csv -s 120 -n_t 30                                                   # train/test setを120行目で分け、パラメータチューニング30回実行し、SARIMAモデル作成
+$ python sarimax_analysis.py -i AirPassengers.csv -s 120 -n_t 30 -fix_s 12                                         # 周期性sを固定してパラメータチューニングしてSARIMAモデル作成
 $ python sarimax_analysis.py -p_m output/SARIMAX_best.joblib -p_s 1959-01-01 -p_e 1960-12-01                       # 予測のみ
 $ python sarimax_analysis.py -i AirPassengers.csv -p_m output/SARIMAX_best.joblib -p_s 1959-01-01 -p_e 1960-12-01  # 予測とtrain dataもplot
 ```
