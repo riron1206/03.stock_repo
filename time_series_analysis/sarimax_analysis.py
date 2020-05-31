@@ -132,7 +132,7 @@ def plot_stationarity(ts: pd.Series, window_size=12, output_dir=None):
     plt.show(block=False)
 
     # Perform Dickey-Fuller test:
-    print('Results of Dickey-Fuller Test:')
+    print('Results of Augmented Dickey-Fuller Test:')
     dftest = sm.tsa.stattools.adfuller(ts, autolag='AIC')
     dfoutput = pd.Series(dftest[0:4], index=['Test Statistic', 'p-value',
                                              '#Lags Used', 'Number of Observations Used'])
