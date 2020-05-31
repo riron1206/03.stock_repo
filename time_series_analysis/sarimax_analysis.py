@@ -177,7 +177,7 @@ def make_ar_model(ar_data: np.ndarray):
     best_lag = model.select_order(maxlag=6, ic='aic')
     print('推定したARモデルの次数:', best_lag)
     # 決定した次数でパラメータ推定
-    model_fit = model.fit(maxlag=best_lag)
+    model_fit = model.fit(maxlag=best_lag, ic='aic')
     # モデルが推定したパラメーター
     print('定数項c, 自己回帰係数Φ1,Φ2,… :', model_fit.params)
     print('ホワイトノイズの分散:', model_fit.sigma2)
@@ -195,15 +195,12 @@ def make_arma_model(arma_data: np.ndarray):
         test_func()のtest_make_ar_arma_arima_model()参照
     """
     # AICでモデルの次数を選択
-    best_order = sm.tsa.arma_order_select_ic(arma_data,
-                                             ic='aic',
-                                             trend='nc')['aic_min_order']
+    best_order = sm.tsa.arma_order_select_ic(arma_data, ic='aic')['aic_min_order']  # trend='nc'とするとバイアス項なし
     print('推定したARMAモデルの次数:', best_order)
     # モデルの生成
-    model = sm.tsa.ARMA(arma_data,
-                        order=[best_order[0], best_order[1]])
+    model = sm.tsa.ARMA(arma_data, order=[best_order[0], best_order[1]])
     # 決定した次数でパラメータ推定
-    model_fit = model.fit(maxlag=max(best_order))
+    model_fit = model.fit(ic='aic')
     # モデルが推定したパラメーター
     print('定数項c, 自己回帰係数Φ1,Φ2,… . 移動平均係数θ1,θ2,…:', model_fit.params)
     print('ホワイトノイズの分散:', model_fit.sigma2)
@@ -224,20 +221,17 @@ def make_arima_model(arima_data: np.ndarray, param_d=1):
         test_func()のtest_make_ar_arma_arima_model()参照
     """
     # AICでモデルの次数を選択
-    best_order = sm.tsa.arma_order_select_ic(arima_data,
-                                             ic='aic',
-                                             trend='nc')['aic_min_order']
+    best_order = sm.tsa.arma_order_select_ic(arima_data, ic='aic')['aic_min_order']  # trend='nc'とするとバイアス項なし
     print('推定したARMAモデルの次数:', best_order)
     # モデルの生成
     # (p,d,q)のパラメータによってはエラーになるのでtryで囲む
     try:
-        model = sm.tsa.ARIMA(arima_data,
-                             order=[best_order[0], param_d, best_order[1]])
+        model = sm.tsa.ARIMA(arima_data, order=[best_order[0], param_d, best_order[1]])
     except:
         traceback.print_exc()
         pass
     # 決定した次数でパラメータ推定
-    model_fit = model.fit(maxlag=max(best_order))
+    model_fit = model.fit(ic='aic')
     # モデルが推定したパラメーター
     print('定数項c, 自己回帰係数Φ1,Φ2,… . 移動平均係数θ1,θ2,…:', model_fit.params)
     print('ホワイトノイズの分散:', model_fit.sigma2)
@@ -258,9 +252,7 @@ def make_sarimax_model(sarimax_data: np.ndarray, param_d=1, param_P=0, param_D=0
         test_func()のtest_make_ar_arma_arima_model()参照
     """
     # AICでモデルの次数を選択
-    best_order = sm.tsa.arma_order_select_ic(sarimax_data,
-                                             ic='aic',
-                                             trend='nc')['aic_min_order']
+    best_order = sm.tsa.arma_order_select_ic(sarimax_data, ic='aic')['aic_min_order']  # trend='nc'とするとバイアス項なし
     print('推定したARMAモデルの次数:', best_order)
     # モデルの生成
     # (p,d,q)のパラメータによってはエラーになるのでtryで囲む
@@ -275,7 +267,7 @@ def make_sarimax_model(sarimax_data: np.ndarray, param_d=1, param_P=0, param_D=0
         traceback.print_exc()
         pass
     # 決定した次数でパラメータ推定
-    model_fit = model.fit(maxlag=max(best_order))
+    model_fit = model.fit(ic='aic', maxiter=200)  # パラメータ推定の回数maxiterをデフォルトの50から200に増やす
     # モデルが推定したパラメーター
     print('定数項c, 自己回帰係数Φ1,Φ2,… . 移動平均係数θ1,θ2,…:', model_fit.params)
     # 結果サマリーのplot
