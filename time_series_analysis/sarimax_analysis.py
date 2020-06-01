@@ -113,6 +113,7 @@ def plot_stationarity(ts: pd.Series, window_size=12, output_dir=None):
     """
     定常性を確認する Augmented Dickey-Fuller test(ADF検定) 結果と標準偏差、平均のプロット
     https://qiita.com/mshinoda88/items/749131478bfefc9bf365
+    ADF検定は帰無仮説『単位根過程（非定常過程）である』を棄却(p値<0.1とか)することで、そのデータが定常過程とみなす
     Usage:
         test_stationarity(ts, window_size=12)
     """
@@ -221,8 +222,14 @@ def make_arima_model(arima_data: np.ndarray, param_d=1):
         test_func()のtest_make_ar_arma_arima_model()参照
     """
     # AICでモデルの次数を選択
-    best_order = sm.tsa.arma_order_select_ic(arima_data, ic='aic')['aic_min_order']  # trend='nc'とするとバイアス項なし
+    # 引数のtrendはモデルの定数とトレンドを指定する。
+    # trend = 'c'    定数のみ（デフォルト値）
+    # trend = 'ct'   定数とトレンド
+    # trend = 'ctt'  定数と１次、２次のトレンド
+    # trend = 'nt'   定数もトレンドもなし
+    best_order = sm.tsa.arma_order_select_ic(arima_data, ic='aic')['aic_min_order']
     print('推定したARMAモデルの次数:', best_order)
+
     # モデルの生成
     # (p,d,q)のパラメータによってはエラーになるのでtryで囲む
     try:
@@ -252,6 +259,11 @@ def make_sarimax_model(sarimax_data: np.ndarray, param_d=1, param_P=0, param_D=0
         test_func()のtest_make_ar_arma_arima_model()参照
     """
     # AICでモデルの次数を選択
+    # 引数のtrendはモデルの定数とトレンドを指定する。
+    # trend = 'c'    定数のみ（デフォルト値）
+    # trend = 'ct'   定数とトレンド
+    # trend = 'ctt'  定数と１次、２次のトレンド
+    # trend = 'nt'   定数もトレンドもなし
     best_order = sm.tsa.arma_order_select_ic(sarimax_data, ic='aic')['aic_min_order']  # trend='nc'とするとバイアス項なし
     print('推定したARMAモデルの次数:', best_order)
     # モデルの生成
