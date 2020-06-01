@@ -4,7 +4,7 @@
 ※ペアトレード：安な銘柄を「買い」、割高な銘柄を「空売り」しておき、株価が近づいたタイミングで反対売買を行い利益を確定する
 
 <具体的な処理>
-1. 1銘柄の収益率の累積積計算
+1. 1銘柄の累積収益率計算
 2. 2銘柄の累積収益率の残差に対してADF検定を実施し、p値の距離行列を作成
 3. p値の距離行列からクラスタリング
 4. p値<0.1のペアについて収益率など可視化
@@ -151,22 +151,22 @@ def plot_pair_return_rate(data_dir, code1, code2, start_date='2020-01-01', figsi
         plt.savefig(os.path.join(output_dir, f'{code1}_{code2}_close.png'), bbox_inches="tight")
     plt.show()
 
-    # 収益率plot
-    fig, ax = plt.subplots(figsize=figsize)
-    df1[[f'{code1}_return_rate']].plot(marker='x', ax=ax)
-    df2[[f'{code2}_return_rate']].plot(marker='x', ax=ax)
-    plt.title('2銘柄の収益率')
-    if output_dir is not None:
-        plt.savefig(os.path.join(output_dir, f'{code1}_{code2}_return_rate.png'), bbox_inches="tight")
-    plt.show()
+    # # 収益率plot
+    # fig, ax = plt.subplots(figsize=figsize)
+    # df1[[f'{code1}_return_rate']].plot(marker='x', ax=ax)
+    # df2[[f'{code2}_return_rate']].plot(marker='x', ax=ax)
+    # plt.title('2銘柄の収益率')
+    # if output_dir is not None:
+    #     plt.savefig(os.path.join(output_dir, f'{code1}_{code2}_return_rate.png'), bbox_inches="tight")
+    # plt.show()
 
-    # 収益率の残差plot
-    fig, ax = plt.subplots(figsize=figsize)
-    return_rate_resid.plot(marker='x', ax=ax)
-    plt.title('2銘柄の収益率の残差')
-    if output_dir is not None:
-        plt.savefig(os.path.join(output_dir, f'{code1}_{code2}_return_rate_resid.png'), bbox_inches="tight")
-    plt.show()
+    # # 収益率の残差plot
+    # fig, ax = plt.subplots(figsize=figsize)
+    # return_rate_resid.plot(marker='x', ax=ax)
+    # plt.title('2銘柄の収益率の残差')
+    # if output_dir is not None:
+    #     plt.savefig(os.path.join(output_dir, f'{code1}_{code2}_return_rate_resid.png'), bbox_inches="tight")
+    # plt.show()
 
     # 累積収益率の残差plot
     fig, ax = plt.subplots(figsize=figsize)
