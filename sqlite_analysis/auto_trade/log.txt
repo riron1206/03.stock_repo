@@ -59,3 +59,15 @@ run signal day: 2020-04-30 00:00:00
 2020/05/29 23:08:42.97 #### make_order_csv.py start!!! #### 
  
 2020/06/01 21:50:17.97 #### make_order_csv.py start!!! #### 
+ 
+2020/06/02 21:43:29.88 #### make_order_csv.py start!!! #### 
+ 
+2020/06/04  0:16:17.26 #### make_order_csv.py start!!! #### 
+ 
+2020/06/08 23:44:05.06 #### make_order_csv.py start!!! #### 
+ 
+2020/06/09 23:09:25.90 #### make_order_csv.py start!!! #### 
+ 
+2020/06/11 22:32:59.86 #### make_order_csv.py start!!! #### 
+ 
+2020/06/14  0:38:49.31 #### make_order_csv.py start!!! #### 
