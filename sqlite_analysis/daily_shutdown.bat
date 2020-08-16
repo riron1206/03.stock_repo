@@ -8,6 +8,10 @@ call daily.bat
 cd C:\Users\81908\jupyter_notebook\stock_work\03.stock_repo\sqlite_analysis\auto_trade
 call 01.run_make_order_csv.bat
 
+@rem ローソク足のモデルで予測しslackに投げる
+cd C:\Users\81908\jupyter_notebook\tf_2_work\stock_work\candlestick_model
+call predict_post_slack.bat
+
 @rem シャットダウンコマンド メッセージを出力し60秒後にパソコンを閉じます
 shutdown /s /t 60 /c "後60秒でシャットダウンします。"
 
